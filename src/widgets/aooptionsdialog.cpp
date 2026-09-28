@@ -442,6 +442,7 @@ void AOOptionsDialog::setupUI()
   FROM_UI(QCheckBox, category_stop_cb)
   FROM_UI(QCheckBox, sfx_on_idle_cb)
   FROM_UI(QCheckBox, evidence_double_click_cb)
+  FROM_UI(QLineEdit, playerlist_format_edit)
 
   FROM_UI(QCheckBox, crossfade_cb)
   FROM_UI(QCheckBox, hide_typing_cb)
@@ -526,7 +527,10 @@ void AOOptionsDialog::setupUI()
   registerOption<QCheckBox, bool>("evidence_double_click_cb",
                                   &Options::evidenceDoubleClickEdit,
                                   &Options::setEvidenceDoubleClickEdit);
-  
+  registerOption<QLineEdit, QString>("playerlist_format_edit",
+                                     &Options::playerlistFormatString,
+                                     &Options::setPlayerlistFormatString);
+
   registerOption<QCheckBox, bool>("hide_typing_cb",
                                   &Options::hideTyping,
                                   &Options::setHideTyping);

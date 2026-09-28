@@ -331,6 +331,10 @@ public:
   QStringList callwords() const;
   void setCallwords(QStringList value);
 
+  // Format string used to render the in-courtroom player list entries.
+  QString playerlistFormatString() const;
+  void setPlayerlistFormatString(QString value);
+
   bool callwords_WholeWord() const;
   void setCallwords_WholeWord(bool value);
   bool callwords_CaseSensitive() const;

@@ -794,6 +794,25 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
     if (t_asset_url.isValid())
     asset_url = t_asset_url.toString();
   }
+  // AO 2.11 player list: register a player (PR) or update one of its fields (PU).
+  else if (header == "PR") {
+    if (!courtroom_constructed || f_contents.size() < 2) {
+      goto end;
+    }
+    PlayerRegister update{
+        f_contents.at(0).toInt(),
+        PlayerRegister::REGISTER_TYPE(f_contents.at(1).toInt())};
+    w_courtroom->playerList()->registerPlayer(update);
+  }
+  else if (header == "PU") {
+    if (!courtroom_constructed || f_contents.size() < 3) {
+      goto end;
+    }
+    PlayerUpdate update{f_contents.at(0).toInt(),
+                        PlayerUpdate::DATA_TYPE(f_contents.at(1).toInt()),
+                        f_contents.at(2)};
+    w_courtroom->playerList()->updatePlayer(update);
+  }
 
   if (log_to_demo) {
     append_to_demofile(f_packet_encoded);

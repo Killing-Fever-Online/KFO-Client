@@ -723,6 +723,19 @@ void Options::setCallwords(QStringList value)
   config.setValue("callwords", value);
 }
 
+QString Options::playerlistFormatString() const
+{
+  return config
+      .value("visuals/playerlist_format",
+             "[{id}] {character} {displayname} {username}")
+      .toString();
+}
+
+void Options::setPlayerlistFormatString(QString value)
+{
+  config.setValue("visuals/playerlist_format", value);
+}
+
 bool Options::callwords_WholeWord() const
 {
   return config.value("callwords_whole_word", false).toBool();

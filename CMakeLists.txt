@@ -46,6 +46,7 @@ qt_add_executable(Attorney_Online
   src/lobby.h
   src/mediatester.h
   src/misc_functions.h
+  src/moderation_functions.h
   src/networkmanager.h
   src/options.h
   src/scrolltext.h
@@ -56,6 +57,8 @@ qt_add_executable(Attorney_Online
   src/widgets/aooptionsdialog.h
   src/widgets/direct_connect_dialog.h
   src/widgets/edit_server_dialog.h
+  src/widgets/moderator_dialog.h
+  src/widgets/playerlistwidget.h
 src/aoapplication.cpp
   src/aoblipplayer.cpp
   src/aobutton.cpp
@@ -86,6 +89,7 @@ src/aoapplication.cpp
   src/lobby.cpp
   src/mediatester.cpp
   src/misc_functions.cpp
+  src/moderation_functions.cpp
   src/networkmanager.cpp
   src/options.cpp
   src/packet_distribution.cpp
@@ -97,6 +101,8 @@ src/aoapplication.cpp
   src/widgets/aooptionsdialog.cpp
   src/widgets/direct_connect_dialog.cpp
   src/widgets/edit_server_dialog.cpp
+  src/widgets/moderator_dialog.cpp
+  src/widgets/playerlistwidget.cpp
   resources.qrc
 )
 
