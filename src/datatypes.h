@@ -81,6 +81,39 @@ struct pos_size_type {
   int height = 0;
 };
 
+// AO 2.11 player list. "PR" registers a player, "PU" updates one of the
+// fields described by PlayerUpdate::DATA_TYPE.
+struct PlayerData {
+  int id = -1;
+  QString name;
+  QString character;
+  QString character_name;
+  int area_id = 0;
+};
+
+struct PlayerRegister {
+  enum REGISTER_TYPE {
+    ADD_PLAYER,
+    REMOVE_PLAYER,
+  };
+
+  int id;
+  REGISTER_TYPE type;
+};
+
+struct PlayerUpdate {
+  enum DATA_TYPE {
+    NAME,
+    CHARACTER,
+    CHARACTER_NAME,
+    AREA_ID,
+  };
+
+  int id;
+  DATA_TYPE type;
+  QString data;
+};
+
 enum CHAT_MESSAGE {
   DESK_MOD = 0,
   PRE_EMOTE,

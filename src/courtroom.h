@@ -13,6 +13,7 @@
 #include "aolayer.h"
 #include "aomusicplayer.h"
 #include "widgets/aooptionsdialog.h"
+#include "widgets/playerlistwidget.h"
 #include "aopacket.h"
 #include "aosfxplayer.h"
 #include "aotextarea.h"
@@ -401,6 +402,8 @@ public:
 
   void on_authentication_state_received(int p_state);
 
+  PlayerListWidget *playerList();
+
   enum JudgeState {
       POS_DEPENDENT = -1,
       HIDE_CONTROLS =  0,
@@ -780,6 +783,7 @@ private:
   AOTextArea *ui_server_chatlog;
 
   QListWidget *ui_mute_list;
+  PlayerListWidget *ui_player_list;
   QTreeWidget *ui_area_list;
   QTreeWidget *ui_music_list;
 

@@ -184,6 +184,9 @@ void AOApplication::call_settings_menu(int initial_tab)
       if(lobby_constructed) {
       }
       l_dialog->exec();
+      if (courtroom_constructed) {
+        w_courtroom->playerList()->reloadPlayers();
+      }
       delete l_dialog;
 
     } catch (const std::exception &e) {
