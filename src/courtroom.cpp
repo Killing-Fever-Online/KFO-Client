@@ -2886,7 +2886,7 @@ bool Courtroom::handle_objection()
             ao_app->get_chat(m_chatmessage[CHAR_NAME]));
       }
       break;
-      m_chatmessage[EMOTE_MOD] = QChar(PREANIM);
+      m_chatmessage[EMOTE_MOD] = QChar(ushort(PREANIM));
     }
     ui_vp_video->set_muted(true);
     ui_vp_objection->load_image(

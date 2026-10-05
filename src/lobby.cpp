@@ -457,7 +457,7 @@ void Lobby::on_demo_clicked(QTreeWidgetItem *item, int column)
     return;
   }
 
-  QString l_filepath = (QApplication::applicationDirPath() + "/logs/%1/%2")
+  QString l_filepath = (get_app_dir_path() + "/logs/%1/%2")
                            .arg(item->data(0, Qt::DisplayRole).toString(),
                                 item->data(1, Qt::DisplayRole).toString());
   ao_app->demo_server->start_server();

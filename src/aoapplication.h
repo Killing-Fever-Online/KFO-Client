@@ -179,7 +179,6 @@ public:
 
   ////// Functions for reading and writing files //////
   // Implementations file_functions.cpp
-
   // returns all of the file's lines in a QStringList
   QStringList get_list_file(VPath path);
   QStringList get_list_file(QString p_file);
