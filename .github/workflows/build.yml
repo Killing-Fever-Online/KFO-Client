@@ -94,18 +94,25 @@ jobs:
           mkdir -p lib bin
           curl -sL http://www.un4seen.com/files/bass24-linux.zip -o bass.zip
           unzip -o -d bass bass.zip
+          cp ./bass/c/bass.h ./lib/
           cp ./bass/libs/x86_64/libbass.so ./lib/
           cp ./bass/libs/x86_64/libbass.so ./bin/
 
           curl -sL http://www.un4seen.com/files/bassmidi24-linux.zip -o bassmidi.zip
           unzip -o -d bass bassmidi.zip
+          cp ./bass/c/bassmidi.h ./lib/
           cp ./bass/libs/x86_64/libbassmidi.so ./lib/
           cp ./bass/libs/x86_64/libbassmidi.so ./bin/
 
           curl -sL http://www.un4seen.com/files/bassopus24-linux.zip -o bassopus.zip
           unzip -o -d bass bassopus.zip
+          cp ./bass/c/bassopus.h ./lib/
           cp ./bass/libs/x86_64/libbassopus.so ./lib/
           cp ./bass/libs/x86_64/libbassopus.so ./bin/
+
+          test -f lib/bass.h
+          test -f lib/bassmidi.h
+          test -f lib/bassopus.h
 
       - name: Install Windows BASS
         if: matrix.platform == 'windows'
@@ -116,18 +123,25 @@ jobs:
           mkdir -p lib bin
           curl -sL http://www.un4seen.com/files/bass24.zip -o bass.zip
           unzip -o -d bass bass.zip
+          cp ./bass/c/bass.h ./lib/
           cp ./bass/c/${ARCH}bass.lib ./lib/
           cp ./bass/${ARCH}bass.dll ./bin/
 
           curl -sL http://www.un4seen.com/files/bassmidi24.zip -o bassmidi.zip
           unzip -o -d bass bassmidi.zip
+          cp ./bass/c/bassmidi.h ./lib/
           cp ./bass/c/${ARCH}bassmidi.lib ./lib/
           cp ./bass/${ARCH}bassmidi.dll ./bin/
 
           curl -sL http://www.un4seen.com/files/bassopus24.zip -o bassopus.zip
           unzip -o -d bass bassopus.zip
+          cp ./bass/c/bassopus.h ./lib/
           cp ./bass/c/${ARCH}bassopus.lib ./lib/
           cp ./bass/${ARCH}bassopus.dll ./bin/
+
+          test -f lib/bass.h
+          test -f lib/bassmidi.h
+          test -f lib/bassopus.h
 
       # ----------------------------------------------------------------
       # QtApng
