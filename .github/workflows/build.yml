@@ -69,10 +69,13 @@ jobs:
         run: |
           curl -L https://github.com/discordapp/discord-rpc/releases/download/v3.4.0/discord-rpc-linux.zip -o discord_rpc.zip
           unzip -o discord_rpc.zip
-          mkdir -p lib bin include
+          mkdir -p lib bin
+
           cp ./discord-rpc/linux-dynamic/lib/libdiscord-rpc.so ./lib/
           cp ./discord-rpc/linux-dynamic/lib/libdiscord-rpc.so ./bin/
-          cp ./discord-rpc/linux-dynamic/include/discord*.h ./include/
+          cp ./discord-rpc/linux-dynamic/include/discord*.h ./lib/
+
+          test -f lib/discord_rpc.h
 
       - name: Install Windows Discord RPC
         if: matrix.platform == 'windows'
@@ -82,10 +85,13 @@ jobs:
         run: |
           curl -L https://github.com/discordapp/discord-rpc/releases/download/v3.4.0/discord-rpc-win.zip -o discord_rpc.zip
           unzip -o discord_rpc.zip
-          mkdir -p lib bin include
+          mkdir -p lib bin
+
           cp ./discord-rpc/win${ARCH}-dynamic/lib/discord-rpc.lib ./lib/
           cp ./discord-rpc/win${ARCH}-dynamic/bin/discord-rpc.dll ./bin/
-          cp ./discord-rpc/win${ARCH}-dynamic/include/discord*.h ./include/
+          cp ./discord-rpc/win${ARCH}-dynamic/include/discord*.h ./lib/
+
+          test -f lib/discord_rpc.h
 
       - name: Install Linux BASS
         if: matrix.platform == 'linux'
