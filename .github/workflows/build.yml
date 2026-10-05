@@ -206,16 +206,19 @@ jobs:
         shell: pwsh
         run: cmake --build build --config Release --parallel
 
+      - name: Flatten Windows output
+        if: matrix.platform == 'windows'
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          if [ -d bin/Release ]; then
+            mv bin/Release/* bin/
+            rmdir bin/Release
+          fi
+
       # ----------------------------------------------------------------
       # Deploy — Windows
       # ----------------------------------------------------------------
-      - name: Copy libssl DLL (Windows)
-        if: matrix.platform == 'windows'
-        shell: bash
-        run: |
-          curl -L https://file.garden/ZVDWuDYwl0xAoRs4/libssl%203.4.1%20win32.zip -o libssl.zip
-          unzip -o libssl.zip -d ./bin/
-
       - name: Deploy Windows
         if: matrix.platform == 'windows'
         working-directory: ${{ github.workspace }}/bin/
