@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.7.0)
+cmake_minimum_required(VERSION 3.21)
 
 project(Attorney_Online VERSION 2.11.0.0 LANGUAGES CXX C)
 
@@ -55,6 +55,7 @@ qt_add_executable(Attorney_Online
   src/widgets/add_server_dialog.h
   src/widgets/aooptionsdialog.h
   src/widgets/direct_connect_dialog.h
+  src/webcache.h
   src/widgets/edit_server_dialog.h
 src/aoapplication.cpp
   src/aoblipplayer.cpp
@@ -96,6 +97,7 @@ src/aoapplication.cpp
   src/widgets/add_server_dialog.cpp
   src/widgets/aooptionsdialog.cpp
   src/widgets/direct_connect_dialog.cpp
+  src/webcache.cpp
   src/widgets/edit_server_dialog.cpp
   resources.qrc
 )

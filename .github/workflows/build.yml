@@ -1,9 +1,11 @@
 name: CI build
 
-on: [push]
+on:
+  push:
+  workflow_dispatch:
 
-env:
-  ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -11,186 +13,282 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 5.15.2
+          - 6.8.3
         platform:
           - linux
           - windows
 
         include:
           - platform: linux
-            os: ubuntu-latest
+            os: ubuntu-24.04
             target: desktop
-            make: make
+            arch: linux_gcc_64
+            modules: 'qtimageformats qtwebsockets qtmultimedia'
 
           - platform: windows
-            os: windows-2019
+            os: windows-2022
             target: desktop
-            make: nmake
+            arch: win64_msvc2022_64
+            modules: 'qtimageformats qtwebsockets qtmultimedia'
 
-    runs-on: ${{matrix.os}}
+    runs-on: ${{ matrix.os }}
+
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - uses: actions/setup-python@master
+
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          
+
       - name: Add msbuild to PATH
         if: matrix.platform == 'windows'
-        uses: microsoft/setup-msbuild@main
-        
-      - name: Downgrade Android NDK
-        if: matrix.platform == 'android'
-        run: |
-          ANDROID_ROOT=/usr/local/lib/android
-          ANDROID_SDK_ROOT=${ANDROID_ROOT}/sdk
-          ANDROID_NDK_ROOT=${ANDROID_SDK_ROOT}/ndk-bundle
-          SDKMANAGER=${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager
-          echo "y" | $SDKMANAGER "ndk;21.4.7075529"
-          echo "y" | $SDKMANAGER "platforms;android-24"
+        uses: microsoft/setup-msbuild@v2
 
-          # this is so stupid but i can't find anything else that works
-          rm -rf $ANDROID_HOME/ndk/25.2.9519653
-          ln -sf $ANDROID_HOME/ndk/21.4.7075529 $ANDROID_HOME/ndk/25.2.9519653
- 
-      - uses: jurplel/install-qt-action@v3
+      - uses: jurplel/install-qt-action@v4
         id: qt
         with:
-          version: ${{matrix.version}}
-          target: ${{matrix.target}}
-          arch: ${{matrix.arch}}
-          tools: ${{matrix.tools}}
+          version: ${{ matrix.version }}
+          target: ${{ matrix.target }}
+          arch: ${{ matrix.arch }}
+          modules: ${{ matrix.modules }}
           cache: true
           cache-key-prefix: qt
 
       - name: Configure MSVC (Windows)
-        if: contains(matrix.platform, 'windows')
+        if: matrix.platform == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install QtApng
-        run: |
-          git clone https://github.com/Skycoder42/QtApng.git
-          cd QtApng
-          cd src/3rdparty
-          chmod +x get_libs.sh
-          ./get_libs.sh 1.3.1 1.6.40
-          cd ../..
-          qmake CONFIG+=install_ok QMAKE_CXXFLAGS+="-fno-sized-deallocation" QT_PLATFORM=${{matrix.platform}}
-          ${{matrix.make}}
-          ${{matrix.make}} INSTALL_ROOT="${Qt5_DIR}" install
-
-      - name: Install Windows Discord RPC
-        if: contains(matrix.os, 'windows')
-        env:
-            ARCH: ${{ matrix.platform == 'windows' && '64' || '32'}}
-        shell: bash
-        run: |
-          curl -L https://github.com/discordapp/discord-rpc/releases/download/v3.4.0/discord-rpc-win.zip -o discord_rpc.zip
-          unzip discord_rpc.zip
-          cp ./discord-rpc/win${ARCH}-dynamic/lib/discord-rpc.lib ./lib/
-          cp ./discord-rpc/win${ARCH}-dynamic/bin/discord-rpc.dll ./bin/
-          cp ./discord-rpc/win${ARCH}-dynamic/include/discord*.h ./include/
-
+      # ----------------------------------------------------------------
+      # Third-party dependencies
+      # ----------------------------------------------------------------
       - name: Install Linux Discord RPC
         if: matrix.platform == 'linux'
+        shell: bash
         run: |
           curl -L https://github.com/discordapp/discord-rpc/releases/download/v3.4.0/discord-rpc-linux.zip -o discord_rpc.zip
-          unzip discord_rpc.zip
+          unzip -o discord_rpc.zip
+          mkdir -p lib bin include
           cp ./discord-rpc/linux-dynamic/lib/libdiscord-rpc.so ./lib/
           cp ./discord-rpc/linux-dynamic/lib/libdiscord-rpc.so ./bin/
           cp ./discord-rpc/linux-dynamic/include/discord*.h ./include/
 
-      - name: Install Windows BASS
-        if: contains(matrix.os, 'windows')
-        env:
-          ARCH: ${{ matrix.platform == 'windows' && '/x64/' || ''}}
+      - name: Install Windows Discord RPC
+        if: matrix.platform == 'windows'
         shell: bash
+        env:
+          ARCH: 64
         run: |
-          curl http://www.un4seen.com/files/bass24.zip -o bass.zip
-          unzip -d bass -o bass.zip
-          cp ./bass/c/${ARCH}bass.lib ./lib/
-          cp ./bass/${ARCH}bass.dll ./bin/
-
-          curl http://www.un4seen.com/files/bassmidi24.zip -o bassmidi.zip
-          unzip -d bass -o bassmidi.zip
-          cp ./bass/c/${ARCH}bassmidi.lib ./lib/
-          cp ./bass/${ARCH}bassmidi.dll ./bin/
-
-          curl http://www.un4seen.com/files/bassopus24.zip -o bassopus.zip
-          unzip -d bass -o bassopus.zip
-          cp ./bass/c/${ARCH}bassopus.lib ./lib/
-          cp ./bass/${ARCH}bassopus.dll ./bin/
+          curl -L https://github.com/discordapp/discord-rpc/releases/download/v3.4.0/discord-rpc-win.zip -o discord_rpc.zip
+          unzip -o discord_rpc.zip
+          mkdir -p lib bin include
+          cp ./discord-rpc/win${ARCH}-dynamic/lib/discord-rpc.lib ./lib/
+          cp ./discord-rpc/win${ARCH}-dynamic/bin/discord-rpc.dll ./bin/
+          cp ./discord-rpc/win${ARCH}-dynamic/include/discord*.h ./include/
 
       - name: Install Linux BASS
         if: matrix.platform == 'linux'
+        shell: bash
         run: |
-          curl http://www.un4seen.com/files/bass24-linux.zip -o bass.zip
-          unzip -d bass -o bass.zip
+          mkdir -p lib bin
+          curl -sL http://www.un4seen.com/files/bass24-linux.zip -o bass.zip
+          unzip -o -d bass bass.zip
           cp ./bass/libs/x86_64/libbass.so ./lib/
           cp ./bass/libs/x86_64/libbass.so ./bin/
 
-          curl http://www.un4seen.com/files/bassmidi24-linux.zip -o bassmidi.zip
-          unzip -d bass -o bassmidi.zip
+          curl -sL http://www.un4seen.com/files/bassmidi24-linux.zip -o bassmidi.zip
+          unzip -o -d bass bassmidi.zip
           cp ./bass/libs/x86_64/libbassmidi.so ./lib/
           cp ./bass/libs/x86_64/libbassmidi.so ./bin/
 
-          curl http://www.un4seen.com/files/bassopus24-linux.zip -o bassopus.zip
-          unzip -d bass -o bassopus.zip
+          curl -sL http://www.un4seen.com/files/bassopus24-linux.zip -o bassopus.zip
+          unzip -o -d bass bassopus.zip
           cp ./bass/libs/x86_64/libbassopus.so ./lib/
           cp ./bass/libs/x86_64/libbassopus.so ./bin/
 
-      - name: qmake
-        if: matrix.platform != 'android'
+      - name: Install Windows BASS
+        if: matrix.platform == 'windows'
+        shell: bash
+        env:
+          ARCH: /x64/
         run: |
-          qmake QMAKE_CXXFLAGS+="-fno-sized-deallocation" DEFINES+=DISCORD CONFIG+=install_ok QT_PLATFORM=${{matrix.platform}}
+          mkdir -p lib bin
+          curl -sL http://www.un4seen.com/files/bass24.zip -o bass.zip
+          unzip -o -d bass bass.zip
+          cp ./bass/c/${ARCH}bass.lib ./lib/
+          cp ./bass/${ARCH}bass.dll ./bin/
 
-      - name: Copy libssl DLL (Windows)
-        if: contains(matrix.os, 'windows')
+          curl -sL http://www.un4seen.com/files/bassmidi24.zip -o bassmidi.zip
+          unzip -o -d bass bassmidi.zip
+          cp ./bass/c/${ARCH}bassmidi.lib ./lib/
+          cp ./bass/${ARCH}bassmidi.dll ./bin/
+
+          curl -sL http://www.un4seen.com/files/bassopus24.zip -o bassopus.zip
+          unzip -o -d bass bassopus.zip
+          cp ./bass/c/${ARCH}bassopus.lib ./lib/
+          cp ./bass/${ARCH}bassopus.dll ./bin/
+
+      # ----------------------------------------------------------------
+      # QtApng
+      # Updated QtApng fork with Qt 6 / CMake support.
+      # Build the plugin directly into bin/imageformats so deployment
+      # does not depend on modifying the Qt installation directory.
+      # ----------------------------------------------------------------
+      - name: Clone QtApng
+        uses: actions/checkout@v6
+        with:
+          repository: jurplel/QtApng
+          path: ./qtapng
+
+      - name: Build QtApng
         shell: bash
         run: |
-          curl https://file.garden/ZVDWuDYwl0xAoRs4/libssl%203.4.1%20win32.zip -o libssl.zip
+          mkdir -p ./bin/imageformats
+          cd ./qtapng
+          cmake . \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE="${{ github.workspace }}/bin/imageformats/" \
+            -DAPNG_QT6=ON \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          cmake --build . --config Release
+
+      # ----------------------------------------------------------------
+      # Build
+      # ----------------------------------------------------------------
+      - name: Configure (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          cmake -B build -S . \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
+            -DCMAKE_EXE_LINKER_FLAGS=-no-pie \
+            -DAO_ENABLE_DISCORD_RPC=ON
+
+      - name: Configure (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          cmake -B build -S . `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
+            -DAO_ENABLE_DISCORD_RPC=ON
+
+      - name: Build (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: cmake --build build -j$(nproc)
+
+      - name: Build (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      # ----------------------------------------------------------------
+      # Deploy — Windows
+      # ----------------------------------------------------------------
+      - name: Copy libssl DLL (Windows)
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          curl -L https://file.garden/ZVDWuDYwl0xAoRs4/libssl%203.4.1%20win32.zip -o libssl.zip
           unzip -o libssl.zip -d ./bin/
 
-      - name: build
-        run: |
-          ${{matrix.make}}
-
       - name: Deploy Windows
-        if: contains(matrix.os, 'windows')
-        working-directory: ${{github.workspace}}/bin/
+        if: matrix.platform == 'windows'
+        working-directory: ${{ github.workspace }}/bin/
         shell: bash
         run: |
-          windeployqt --no-quick-import --no-translations --no-virtualkeyboard --no-compiler-runtime --no-webkit2 --no-opengl-sw .
-          cp ../QtApng/plugins/imageformats/qapng.dll ./imageformats/
-          rm ./imageformats/qtiff.dll
-          rm ./imageformats/qicns.dll
-          rm ./imageformats/qico.dll
-          rm ./imageformats/qsvg.dll
-          rm ./imageformats/qtga.dll
-          rm ./imageformats/qwbmp.dll
-          rm ./Qt5Svg.dll
-          rm -r iconengines
-          rm -r bearer
+          windeployqt --no-quick-import --no-translations --no-virtualkeyboard \
+            --no-compiler-runtime --no-webkit2 --no-opengl-sw .
+          rm -f ./imageformats/qtiff.dll ./imageformats/qicns.dll ./imageformats/qico.dll
+          rm -f ./imageformats/qsvg.dll ./imageformats/qtga.dll ./imageformats/qwbmp.dll
+          rm -rf iconengines bearer
 
-      - name: Deploy Linux
+      # ----------------------------------------------------------------
+      # Deploy — Linux AppImage
+      # ----------------------------------------------------------------
+      - name: Prepare AppDir (Linux)
         if: matrix.platform == 'linux'
-        working-directory: ${{github.workspace}}/bin/
         shell: bash
         run: |
-          cp ../scripts/launch.sh .
-          mkdir -p imageformats
-          cp ../QtApng/plugins/imageformats/libqapng.so ./imageformats/libqapng.so
-          chmod +x launch.sh
-          chmod +x Attorney_Online
-          tar -cf Attorney_Online.tar ./*
-          rm -rf imageformats
-          rm *.so
-          rm *.sh
-          rm Attorney_Online
+          set -e
+          mkdir -p AppDir/usr/bin AppDir/usr/lib AppDir/usr/plugins/imageformats
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@master
+          # Main binary (output goes to bin/ via RUNTIME_OUTPUT_DIRECTORY)
+          cp bin/Attorney_Online AppDir/usr/bin/
+
+          # BASS + Discord RPC
+          cp bin/libbass.so        AppDir/usr/lib/
+          cp bin/libbassopus.so    AppDir/usr/lib/
+          cp bin/libbassmidi.so    AppDir/usr/lib/
+          cp bin/libdiscord-rpc.so AppDir/usr/lib/
+
+          # QtApng and any other locally-built imageformat plugins
+          cp bin/imageformats/* AppDir/usr/plugins/imageformats/ 2>/dev/null || true
+
+          # Icon — pick the first candidate that exists
+          ICON=""
+          for c in icons/icon.png resource/logo-client.png resources/logo-client.png; do
+            if [ -f "$c" ]; then ICON="$c"; break; fi
+          done
+
+          if [ -z "$ICON" ]; then
+            # 1x1 transparent PNG fallback
+            printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xcf\xc0\x00\x00\x00\x03\x00\x01' > AppDir/Attorney_Online.png
+          else
+            cp "$ICON" AppDir/Attorney_Online.png
+          fi
+
+          cat > AppDir/Attorney_Online.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Attorney Online
+          Comment=Online courtroom simulation client
+          Exec=Attorney_Online
+          Icon=Attorney_Online
+          Categories=Game;
+          Terminal=false
+          EOF
+
+      - name: Build AppImage (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+
+          # linuxdeploy needs to see the Qt plugin dir so it can bundle imageformats
+          export QMAKE="${QT_ROOT_DIR}/bin/qmake"
+
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/Attorney_Online \
+            --plugin qt \
+            --output appimage
+
+          OUT=$(ls *.AppImage | grep -v '^linuxdeploy' | head -n1)
+          mv "$OUT" Attorney_Online-Linux-x86_64.AppImage
+          chmod +x Attorney_Online-Linux-x86_64.AppImage
+
+      # ----------------------------------------------------------------
+      # Upload artifacts
+      # ----------------------------------------------------------------
+      - name: Upload Linux artifact
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v6
         with:
-          name: Attorney_Online-${{matrix.os}}-${{matrix.platform}}
-          path: ${{github.workspace}}/bin/
+          name: Attorney_Online-${{ matrix.os }}-${{ matrix.platform }}
+          path: Attorney_Online-Linux-x86_64.AppImage
+
+      - name: Upload Windows artifact
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: Attorney_Online-${{ matrix.os }}-${{ matrix.platform }}
+          path: ${{ github.workspace }}/bin/
