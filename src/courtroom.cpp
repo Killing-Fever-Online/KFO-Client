@@ -1550,9 +1550,12 @@ QFont Courtroom::get_qfont(QString font_name, int f_pointsize, bool antialias)
     font_name = "Arial";
 
   QFont::StyleStrategy style_strategy = QFont::PreferDefault;
+  // being able to disable anti-aliasing on Linux is disabled due to looking like absolute garbage
+  // stupid software patents
+#ifndef Q_OS_LINUX
   if (!antialias)
     style_strategy = QFont::NoAntialias;
-
+#endif
   font = QFont(font_name, f_pointsize);
   font.setStyleHint(QFont::SansSerif, style_strategy);
   return font;
