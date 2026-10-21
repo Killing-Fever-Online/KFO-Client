@@ -22,8 +22,6 @@ PlayerListWidget::PlayerListWidget(AOApplication *ao_app, QWidget *parent)
 
   connect(this, &PlayerListWidget::customContextMenuRequested, this,
           &PlayerListWidget::onCustomContextMenuRequested);
-  connect(this, &PlayerListWidget::itemClicked, this,
-          &PlayerListWidget::onItemClicked);
 }
 
 PlayerListWidget::~PlayerListWidget() {}
@@ -63,6 +61,7 @@ void PlayerListWidget::updatePlayer(const PlayerUpdate &update)
 
   case PlayerUpdate::CHARACTER:
     player.character = update.data;
+    m_iniswap_map.remove(update.id); // Iniswaps are tied to the base character.
     update_icon = true;
     break;
 
@@ -101,6 +100,15 @@ void PlayerListWidget::setPairedPlayer(int playerId)
   }
 }
 
+void PlayerListWidget::setPlayerIniswap(int playerId, const QString &iniswap)
+{
+  m_iniswap_map.insert(playerId, iniswap);
+  if (m_player_map.contains(playerId))
+  {
+    updatePlayer(playerId, true);
+  }
+}
+
 void PlayerListWidget::setAuthenticated(bool f_state)
 {
   m_is_authenticated = f_state;
@@ -109,17 +117,6 @@ void PlayerListWidget::setAuthenticated(bool f_state)
     updatePlayer(data.id, false);
     filterPlayerList();
   }
-}
-
-void PlayerListWidget::onItemClicked(QListWidgetItem *item)
-{
-  if (item == nullptr)
-  {
-    return;
-  }
-
-  const int id = item->data(Qt::UserRole).toInt();
-  Q_EMIT playerClicked(id, m_player_map.value(id).character);
 }
 
 void PlayerListWidget::onCustomContextMenuRequested(const QPoint &pos)
@@ -134,6 +131,21 @@ void PlayerListWidget::onCustomContextMenuRequested(const QPoint &pos)
 
   QMenu *menu = new QMenu(this);
   menu->setAttribute(Qt::WA_DeleteOnClose);
+
+  if (id == m_paired_player_id)
+  {
+    QAction *unpair_action = menu->addAction(tr("Unpair"));
+    connect(unpair_action, &QAction::triggered, this,
+            [this] { Q_EMIT pairRequested(-1, QString()); });
+  }
+  else if (!m_player_map.value(id).character.isEmpty())
+  {
+    const QString character = m_player_map.value(id).character;
+    QAction *pair_action = menu->addAction(tr("Pair with %1").arg(name));
+    connect(pair_action, &QAction::triggered, this, [this, id, character] {
+      Q_EMIT pairRequested(id, character);
+    });
+  }
 
   QAction *report_player_action = menu->addAction("Report Player");
   connect(report_player_action, &QAction::triggered, this, [this, id, name] {
@@ -173,6 +185,7 @@ void PlayerListWidget::onCustomContextMenuRequested(const QPoint &pos)
 
 void PlayerListWidget::addPlayer(int playerId)
 {
+  m_iniswap_map.remove(playerId);
   m_player_map.insert(playerId, PlayerData{.id = playerId});
   QListWidgetItem *item = new QListWidgetItem(this);
   item->setData(Qt::UserRole, playerId);
@@ -195,6 +208,7 @@ void PlayerListWidget::removePlayer(int playerId)
 
   delete takeItem(row(m_item_map.take(playerId)));
   m_player_map.remove(playerId);
+  m_iniswap_map.remove(playerId);
 }
 
 void PlayerListWidget::filterPlayerList()
@@ -233,6 +247,24 @@ void PlayerListWidget::updatePlayer(int playerId, bool updateIcon)
   font.setBold(playerId == m_paired_player_id);
   item->setFont(font);
 
+  if (updateIcon)
+  {
+    // Prefer the iniswap's icon, then the base character's, then none.
+    QString icon_path;
+    const QString iniswap = m_iniswap_map.value(playerId);
+    if (!iniswap.isEmpty())
+    {
+      icon_path = ao_app->get_image_suffix(
+          ao_app->get_character_path(iniswap, "char_icon"), true);
+    }
+    if (icon_path.isEmpty() && !data.character.isEmpty())
+    {
+      icon_path = ao_app->get_image_suffix(
+          ao_app->get_character_path(data.character, "char_icon"), true);
+    }
+    item->setIcon(icon_path.isEmpty() ? QIcon() : QIcon(icon_path));
+  }
+
   if (data.character.isEmpty())
   {
     item->setToolTip(QString());
@@ -246,12 +278,6 @@ void PlayerListWidget::updatePlayer(int playerId, bool updateIcon)
   }
 
   item->setToolTip(tooltip);
-
-  if (updateIcon)
-  {
-    item->setIcon(QIcon(ao_app->get_image_suffix(
-        ao_app->get_character_path(data.character, "char_icon"), true)));
-  }
 }
 
 QString PlayerListWidget::formatLabel(const PlayerData &data)

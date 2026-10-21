@@ -851,8 +851,8 @@ Courtroom::Courtroom(AOApplication *p_ao_app) : QMainWindow()
           &Courtroom::on_showname_enable_clicked);
 
   connect(ui_pair_button, &AOButton::clicked, this, &Courtroom::on_pair_clicked);
-  connect(ui_player_list, &PlayerListWidget::playerClicked, this,
-          &Courtroom::on_player_list_clicked);
+  connect(ui_player_list, &PlayerListWidget::pairRequested, this,
+          &Courtroom::on_player_pair_requested);
   connect(ui_pair_offset_spinbox, QOverload<int>::of(&QSpinBox::valueChanged), this,
           &Courtroom::on_pair_offset_changed);
   connect(ui_pair_vert_offset_spinbox, QOverload<int>::of(&QSpinBox::valueChanged), this,
@@ -1139,8 +1139,19 @@ void Courtroom::set_widgets()
   QString music_list_animated = ao_app->get_design_element("music_list_animated", "courtroom_design.ini");
   ui_music_list->setAnimated(music_list_animated == "1" || music_list_animated.startsWith("true"));
 
-  set_size_and_pos(ui_player_list, "pair_list");
-  ui_player_list->hide();
+  // Prefer the standard AO2 2.11 "player_list" position when the theme defines
+  // it; otherwise fall back to the old pairing menu slot and toggle it with the
+  // pair button.
+  const pos_size_type player_list_dims =
+      ao_app->get_element_dimensions("player_list", "courtroom_design.ini");
+  player_list_themed =
+      !(player_list_dims.width < 0 || player_list_dims.height < 0);
+  set_size_and_pos(ui_player_list,
+                   player_list_themed ? "player_list" : "pair_list");
+  if (player_list_themed)
+    ui_player_list->show();
+  else
+    ui_player_list->hide();
   ui_player_list->setToolTip(tr("Select a player you wish to pair with."));
 
   set_size_and_pos(ui_music_name, "music_name");
@@ -2665,6 +2676,14 @@ void Courtroom::unpack_chatmessage(QStringList p_contents)
     else {
       m_chatmessage[n_string] = "";
     }
+  }
+
+  // Keep the player list icon in sync with the character (including iniswaps)
+  // each player is currently using. CHAR_NAME is the folder actually shown.
+  bool speaker_id_ok = false;
+  const int speaker_id = m_chatmessage[CHAR_ID].toInt(&speaker_id_ok);
+  if (speaker_id_ok && !m_chatmessage[CHAR_NAME].isEmpty()) {
+    ui_player_list->setPlayerIniswap(speaker_id, m_chatmessage[CHAR_NAME]);
   }
 
   // if the char ID matches our client's char ID (most likely, this is our message coming back to us)
@@ -5841,10 +5860,13 @@ void Courtroom::on_mute_list_clicked(QModelIndex p_index)
   }
 }
 
-void Courtroom::on_player_list_clicked(int playerId, const QString &character)
+void Courtroom::on_player_pair_requested(int playerId, const QString &character)
 {
-  if (character.isEmpty()) {
-    return; // Player has no character (e.g. a spectator), nothing to pair with.
+  if (playerId < 0 || character.isEmpty()) {
+    // "Unpair" from the player list context menu.
+    other_charid = -1;
+    ui_player_list->setPairedPlayer(-1);
+    return;
   }
 
   int f_cid = -1;
@@ -5861,9 +5883,8 @@ void Courtroom::on_player_list_clicked(int playerId, const QString &character)
     return;
   }
 
-  // Left-clicking the already-paired player unpairs, mirroring the old menu.
-  other_charid = (other_charid == f_cid) ? -1 : f_cid;
-  ui_player_list->setPairedPlayer(other_charid == -1 ? -1 : playerId);
+  other_charid = f_cid;
+  ui_player_list->setPairedPlayer(playerId);
 }
 
 void Courtroom::on_music_list_double_clicked(QTreeWidgetItem *p_item,
@@ -6207,7 +6228,8 @@ void Courtroom::on_mute_clicked()
 {
   if (ui_mute_list->isHidden()) {
     ui_mute_list->show();
-    ui_player_list->hide();
+    if (!player_list_themed)
+      ui_player_list->hide();
     ui_pair_offset_spinbox->hide();
     ui_pair_vert_offset_spinbox->hide();
     ui_pair_order_dropdown->hide();
@@ -6222,8 +6244,11 @@ void Courtroom::on_mute_clicked()
 
 void Courtroom::on_pair_clicked()
 {
-  if (ui_player_list->isHidden()) {
-    ui_player_list->show();
+  // The offset/order controls are the real toggle; with a standard 2.11 theme
+  // the player list itself stays visible.
+  if (ui_pair_offset_spinbox->isHidden()) {
+    if (!player_list_themed)
+      ui_player_list->show();
     ui_pair_offset_spinbox->show();
     if(ao_app->y_offset_supported)
         ui_pair_vert_offset_spinbox->show();
@@ -6233,7 +6258,8 @@ void Courtroom::on_pair_clicked()
     ui_pair_button->set_image("pair_button_pressed");
   }
   else {
-    ui_player_list->hide();
+    if (!player_list_themed)
+      ui_player_list->hide();
     ui_pair_offset_spinbox->hide();
     ui_pair_vert_offset_spinbox->hide();
     ui_pair_order_dropdown->hide();

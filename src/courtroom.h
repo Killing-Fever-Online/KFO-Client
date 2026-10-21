@@ -461,6 +461,9 @@ private:
   // 0 = in front, 1 = behind
   int pair_order = 0;
 
+  // True when the theme defines the standard AO2 2.11 "player_list" position.
+  bool player_list_themed = false;
+
   // RP clock
   int m_current_clock = 0;
 
@@ -984,7 +987,7 @@ private slots:
   void chat_tick();
 
   void on_mute_list_clicked(QModelIndex p_index);
-  void on_player_list_clicked(int playerId, const QString &character);
+  void on_player_pair_requested(int playerId, const QString &character);
 
   void on_ooc_return_pressed();
   void on_ooc_commands_load(bool file_load, QString filename);
