@@ -93,7 +93,6 @@ public:
   void append_area(QString f_area) { area_list.append(f_area); }
   void clear_chars() { char_list.clear(); }
   void clear_mute() { ui_mute_list->clear(); }
-  void clear_pair_list() { ui_pair_list->clear(); }
   void clear_music() { music_list.clear(); }
   void clear_areas() { area_list.clear(); }
 
@@ -199,9 +198,6 @@ public:
 
   // sets the local mute list based on characters available on the server
   void set_mute_list();
-
-  // Sets the local pair list based on the characters available on the server.
-  void set_pair_list();
 
   // sets desk and bg based on pos in chatmessage
   void set_scene(bool show_desk, QString f_side);
@@ -798,7 +794,6 @@ private:
   AOImage *ui_rp_clock;
 
   AOButton *ui_pair_button;
-  QListWidget *ui_pair_list;
   QSpinBox *ui_pair_offset_spinbox;
   QSpinBox *ui_pair_vert_offset_spinbox;
 
@@ -989,7 +984,7 @@ private slots:
   void chat_tick();
 
   void on_mute_list_clicked(QModelIndex p_index);
-  void on_pair_list_clicked(QModelIndex p_index);
+  void on_player_list_clicked(int playerId, const QString &character);
 
   void on_ooc_return_pressed();
   void on_ooc_commands_load(bool file_load, QString filename);

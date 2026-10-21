@@ -26,6 +26,8 @@ public:
   void reloadPlayers();
 
   void setAuthenticated(bool f_state);
+  // Highlights the player currently selected for pairing (-1 clears it).
+  void setPairedPlayer(int playerId);
 
 private:
   AOApplication *ao_app;
@@ -33,6 +35,7 @@ private:
   QMap<int, QListWidgetItem *> m_item_map;
   QPair<int, QPointer<ModeratorDialog>> active_moderator_menu;
   bool m_is_authenticated = false;
+  int m_paired_player_id = -1;
 
   void addPlayer(int playerId);
   void removePlayer(int playerId);
@@ -44,9 +47,13 @@ private:
 
 Q_SIGNALS:
   void notify(const QString &message);
+  // Emitted when a player is left-clicked. The character is empty when the
+  // player has not yet picked one (e.g. a spectator).
+  void playerClicked(int playerId, const QString &character);
 
 private Q_SLOTS:
   void onCustomContextMenuRequested(const QPoint &pos);
+  void onItemClicked(QListWidgetItem *item);
 };
 
 #endif // PLAYERLISTWIDGET_H

@@ -424,9 +424,6 @@ Courtroom::Courtroom(AOApplication *p_ao_app) : QMainWindow()
   ui_player_list = new PlayerListWidget(ao_app, this);
   ui_player_list->setObjectName("ui_player_list");
 
-  ui_pair_list = new QListWidget(this);
-  ui_pair_list->setObjectName("ui_pair_list");
-
   ui_pair_offset_spinbox = new QSpinBox(this);
   ui_pair_offset_spinbox->setRange(-100, 100);
   ui_pair_offset_spinbox->setSuffix("% x");
@@ -454,7 +451,7 @@ Courtroom::Courtroom(AOApplication *p_ao_app) : QMainWindow()
 
   // TODO : Properly handle widget creation order.
   // Good enough for 2.10
-  ui_pair_list->raise();
+  ui_player_list->raise();
 
   ui_vp_char_icon->raise();
   ui_vp_pencil->raise();
@@ -854,8 +851,8 @@ Courtroom::Courtroom(AOApplication *p_ao_app) : QMainWindow()
           &Courtroom::on_showname_enable_clicked);
 
   connect(ui_pair_button, &AOButton::clicked, this, &Courtroom::on_pair_clicked);
-  connect(ui_pair_list, &QListWidget::clicked, this,
-          &Courtroom::on_pair_list_clicked);
+  connect(ui_player_list, &PlayerListWidget::playerClicked, this,
+          &Courtroom::on_player_list_clicked);
   connect(ui_pair_offset_spinbox, QOverload<int>::of(&QSpinBox::valueChanged), this,
           &Courtroom::on_pair_offset_changed);
   connect(ui_pair_vert_offset_spinbox, QOverload<int>::of(&QSpinBox::valueChanged), this,
@@ -969,20 +966,6 @@ void Courtroom::set_mute_list()
   for (const QString &i_name : sorted_mute_list) {
     // mute_map.insert(i_name, false);
     ui_mute_list->addItem(i_name);
-  }
-}
-
-void Courtroom::set_pair_list()
-{
-  QStringList sorted_pair_list;
-
-  for (const char_type &i_char : std::as_const(char_list))
-    sorted_pair_list.append(i_char.name);
-
-  sorted_pair_list.sort();
-
-  for (const QString &i_name : sorted_pair_list) {
-    ui_pair_list->addItem(i_name);
   }
 }
 
@@ -1118,10 +1101,6 @@ void Courtroom::set_widgets()
   set_size_and_pos(ui_mute_list, "mute_list");
   ui_mute_list->hide();
 
-  set_size_and_pos(ui_pair_list, "pair_list");
-  ui_pair_list->hide();
-  ui_pair_list->setToolTip(tr("Select a character you wish to pair with."));
-
   set_size_and_pos(ui_pair_offset_spinbox, "pair_offset_spinbox");
   ui_pair_offset_spinbox->hide();
   ui_pair_offset_spinbox->setToolTip(
@@ -1160,8 +1139,9 @@ void Courtroom::set_widgets()
   QString music_list_animated = ao_app->get_design_element("music_list_animated", "courtroom_design.ini");
   ui_music_list->setAnimated(music_list_animated == "1" || music_list_animated.startsWith("true"));
 
-  set_size_and_pos(ui_player_list, "player_list");
-  ui_player_list->show();
+  set_size_and_pos(ui_player_list, "pair_list");
+  ui_player_list->hide();
+  ui_player_list->setToolTip(tr("Select a player you wish to pair with."));
 
   set_size_and_pos(ui_music_name, "music_name");
 
@@ -1674,7 +1654,6 @@ void Courtroom::done_received()
   }
 
   set_mute_list();
-  set_pair_list();
 
   show();
 
@@ -5862,46 +5841,29 @@ void Courtroom::on_mute_list_clicked(QModelIndex p_index)
   }
 }
 
-void Courtroom::on_pair_list_clicked(QModelIndex p_index)
+void Courtroom::on_player_list_clicked(int playerId, const QString &character)
 {
-  QListWidgetItem *f_item = ui_pair_list->item(p_index.row());
-  QString f_char = f_item->text();
-  QString real_char;
-  int f_cid = -1;
-
-  if (f_char.endsWith(" [x]")) {
-    real_char = f_char.left(f_char.size() - 4);
-    f_item->setText(real_char);
+  if (character.isEmpty()) {
+    return; // Player has no character (e.g. a spectator), nothing to pair with.
   }
-  else {
-    real_char = f_char;
-    for (int n_char = 0; n_char < char_list.size(); n_char++) {
-      if (char_list.at(n_char).name == real_char)
-        f_cid = n_char;
+
+  int f_cid = -1;
+  for (int n_char = 0; n_char < char_list.size(); n_char++) {
+    if (char_list.at(n_char).name == character) {
+      f_cid = n_char;
+      break;
     }
   }
 
-  if (f_cid < -2 || f_cid >= char_list.size()) {
-    qWarning() << "" << real_char << " not present in char_list";
+  if (f_cid < 0 || f_cid >= char_list.size()) {
+    qWarning() << "Player" << playerId << "character" << character
+               << "not present in char_list";
     return;
   }
 
-  other_charid = f_cid;
-
-  // Redo the character list.
-  QStringList sorted_pair_list;
-
-  for (const char_type &i_char : std::as_const(char_list))
-    sorted_pair_list.append(i_char.name);
-
-  sorted_pair_list.sort();
-
-  for (int i = 0; i < ui_pair_list->count(); i++) {
-    ui_pair_list->item(i)->setText(sorted_pair_list.at(i));
-  }
-  if (other_charid != -1) {
-    f_item->setText(real_char + " [x]");
-  }
+  // Left-clicking the already-paired player unpairs, mirroring the old menu.
+  other_charid = (other_charid == f_cid) ? -1 : f_cid;
+  ui_player_list->setPairedPlayer(other_charid == -1 ? -1 : playerId);
 }
 
 void Courtroom::on_music_list_double_clicked(QTreeWidgetItem *p_item,
@@ -6245,7 +6207,7 @@ void Courtroom::on_mute_clicked()
 {
   if (ui_mute_list->isHidden()) {
     ui_mute_list->show();
-    ui_pair_list->hide();
+    ui_player_list->hide();
     ui_pair_offset_spinbox->hide();
     ui_pair_vert_offset_spinbox->hide();
     ui_pair_order_dropdown->hide();
@@ -6260,8 +6222,8 @@ void Courtroom::on_mute_clicked()
 
 void Courtroom::on_pair_clicked()
 {
-  if (ui_pair_list->isHidden()) {
-    ui_pair_list->show();
+  if (ui_player_list->isHidden()) {
+    ui_player_list->show();
     ui_pair_offset_spinbox->show();
     if(ao_app->y_offset_supported)
         ui_pair_vert_offset_spinbox->show();
@@ -6271,7 +6233,7 @@ void Courtroom::on_pair_clicked()
     ui_pair_button->set_image("pair_button_pressed");
   }
   else {
-    ui_pair_list->hide();
+    ui_player_list->hide();
     ui_pair_offset_spinbox->hide();
     ui_pair_vert_offset_spinbox->hide();
     ui_pair_order_dropdown->hide();

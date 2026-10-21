@@ -7,6 +7,7 @@
 #include "widgets/moderator_dialog.h"
 
 #include <QAction>
+#include <QFont>
 #include <QIcon>
 #include <QListWidgetItem>
 #include <QMenu>
@@ -21,6 +22,8 @@ PlayerListWidget::PlayerListWidget(AOApplication *ao_app, QWidget *parent)
 
   connect(this, &PlayerListWidget::customContextMenuRequested, this,
           &PlayerListWidget::onCustomContextMenuRequested);
+  connect(this, &PlayerListWidget::itemClicked, this,
+          &PlayerListWidget::onItemClicked);
 }
 
 PlayerListWidget::~PlayerListWidget() {}
@@ -84,6 +87,20 @@ void PlayerListWidget::reloadPlayers()
   }
 }
 
+void PlayerListWidget::setPairedPlayer(int playerId)
+{
+  if (m_paired_player_id == playerId)
+  {
+    return;
+  }
+
+  m_paired_player_id = playerId;
+  for (const PlayerData &player : std::as_const(m_player_map))
+  {
+    updatePlayer(player.id, false);
+  }
+}
+
 void PlayerListWidget::setAuthenticated(bool f_state)
 {
   m_is_authenticated = f_state;
@@ -92,6 +109,17 @@ void PlayerListWidget::setAuthenticated(bool f_state)
     updatePlayer(data.id, false);
     filterPlayerList();
   }
+}
+
+void PlayerListWidget::onItemClicked(QListWidgetItem *item)
+{
+  if (item == nullptr)
+  {
+    return;
+  }
+
+  const int id = item->data(Qt::UserRole).toInt();
+  Q_EMIT playerClicked(id, m_player_map.value(id).character);
 }
 
 void PlayerListWidget::onCustomContextMenuRequested(const QPoint &pos)
@@ -160,6 +188,11 @@ void PlayerListWidget::removePlayer(int playerId)
     Q_EMIT notify("Closed Moderation Dialog : User left the server.");
   }
 
+  if (m_paired_player_id == playerId)
+  {
+    m_paired_player_id = -1;
+  }
+
   delete takeItem(row(m_item_map.take(playerId)));
   m_player_map.remove(playerId);
 }
@@ -195,6 +228,11 @@ void PlayerListWidget::updatePlayer(int playerId, bool updateIcon)
   }
 
   item->setText(formatLabel(data));
+
+  QFont font = item->font();
+  font.setBold(playerId == m_paired_player_id);
+  item->setFont(font);
+
   if (data.character.isEmpty())
   {
     item->setToolTip(QString());
