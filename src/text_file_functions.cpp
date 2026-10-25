@@ -108,7 +108,7 @@ bool AOApplication::append_to_file(QString p_text, QString p_file,
 
 QMultiMap<QString, QString> AOApplication::load_demo_logs_list() const
 {
-    QString l_log_path = applicationDirPath() + "/logs/";
+    QString l_log_path = get_app_dir_path() + "/logs/";
     QDir l_log_folder(l_log_path);
     l_log_folder.setFilter(QDir::NoDotAndDotDot | QDir::Dirs);
 

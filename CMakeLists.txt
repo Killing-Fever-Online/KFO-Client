@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.7.0)
+cmake_minimum_required(VERSION 3.21)
 
 project(Attorney_Online VERSION 2.11.0.0 LANGUAGES CXX C)
 

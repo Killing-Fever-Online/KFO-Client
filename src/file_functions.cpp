@@ -27,6 +27,20 @@ bool exists(QString p_path)
   return file.exists();
 }
 
+QString get_app_dir_path()
+{
+#ifdef Q_OS_LINUX
+  // When running from an AppImage, $APPIMAGE points to the .AppImage file.
+  // Put "base/" next to the .AppImage so users can drop assets beside it.
+  QByteArray appimage = qgetenv("APPIMAGE");
+  if (!appimage.isEmpty()) {
+    QFileInfo appimageInfo(QString::fromLocal8Bit(appimage));
+    return appimageInfo.absoluteDir().absolutePath();
+  }
+#endif
+  return QCoreApplication::applicationDirPath();
+}
+
 QString get_base_path()
 {
   QString base_path = "";
@@ -42,7 +56,7 @@ QString get_base_path()
 #elif defined(__APPLE__)
   base_path = QCoreApplication::applicationDirPath() + "/../../../base/";
 #else
-  base_path = QCoreApplication::applicationDirPath() + "/base/";
+  base_path = get_app_dir_path() + "/base/";
 #endif
   return base_path;
 }
