@@ -421,6 +421,9 @@ Courtroom::Courtroom(AOApplication *p_ao_app) : QMainWindow()
   ui_mute_list = new QListWidget(this);
   ui_mute_list->setObjectName("ui_mute_list");
 
+  ui_player_list = new PlayerListWidget(ao_app, this);
+  ui_player_list->setObjectName("ui_player_list");
+
   ui_pair_list = new QListWidget(this);
   ui_pair_list->setObjectName("ui_pair_list");
 
@@ -886,6 +889,11 @@ Courtroom::Courtroom(AOApplication *p_ao_app) : QMainWindow()
 
   connect(ui_vp_video, &VideoScreen::finished, this, &Courtroom::video_finished);
 
+  connect(ui_player_list, &PlayerListWidget::notify, this,
+          [this](const QString &message) {
+            append_server_chatmessage("CLIENT", message, "1");
+          });
+
   set_widgets();
   set_char_select();
 }
@@ -1151,6 +1159,9 @@ void Courtroom::set_widgets()
 
   QString music_list_animated = ao_app->get_design_element("music_list_animated", "courtroom_design.ini");
   ui_music_list->setAnimated(music_list_animated == "1" || music_list_animated.startsWith("true"));
+
+  set_size_and_pos(ui_player_list, "player_list");
+  ui_player_list->show();
 
   set_size_and_pos(ui_music_name, "music_name");
 
@@ -2187,6 +2198,7 @@ void Courtroom::on_authentication_state_received(int p_state)
 {
   if (p_state >= 1) {
     ui_guard->show();
+    ui_player_list->setAuthenticated(true);
     append_server_chatmessage(tr("CLIENT"), tr("You were granted the Disable Modcalls button."), "1");
   }
   else if (p_state == 0) {
@@ -2194,8 +2206,14 @@ void Courtroom::on_authentication_state_received(int p_state)
   }
   else if (p_state < 0) {
     ui_guard->hide();
+    ui_player_list->setAuthenticated(false);
     append_server_chatmessage(tr("CLIENT"), tr("You were logged out."), "1");
   }
+}
+
+PlayerListWidget *Courtroom::playerList()
+{
+  return ui_player_list;
 }
 
 void Courtroom::on_chat_return_pressed()
