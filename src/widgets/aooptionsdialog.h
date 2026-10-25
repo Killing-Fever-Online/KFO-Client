@@ -71,6 +71,7 @@ private:
   QLineEdit *ui_default_showname_textbox;
   QFrame *ui_net_divider;
   QLineEdit *ui_ms_textbox;
+  QLineEdit *ui_playerlist_format_edit;
   QCheckBox *ui_discord_cb;
   QLabel *ui_language_label;
   QComboBox *ui_language_combobox;
