@@ -773,6 +773,10 @@ Courtroom::Courtroom(AOApplication *p_ao_app) : QMainWindow()
           ui_ooc_chat_message->setCursorPosition(ui_ooc_chat_message->text().length());
   });
 
+  connect(ui_ooc_chat_name, &QLineEdit::textChanged, this, [this](const QString &text) {
+      ooc_name = text;
+  });
+
   connect(ui_music_list, &QTreeWidget::itemDoubleClicked,
           this, &Courtroom::on_music_list_double_clicked);
   connect(ui_music_list, &QTreeWidget::customContextMenuRequested, this,
@@ -5024,10 +5028,10 @@ void Courtroom::on_ooc_return_pressed()
       append_server_chatmessage(tr("CLIENT"),
                                 tr("Case made by %1.").arg(caseauth), "1");
     if (!casedoc.isEmpty()) {
-      ao_app->send_server_packet(new AOPacket("CT", {ui_ooc_chat_name->text(), "/doc " + casedoc}));
+      ao_app->send_server_packet(new AOPacket("CT", {ooc_name, "/doc " + casedoc}));
     }
     if (!casestatus.isEmpty()) {
-      ao_app->send_server_packet(new AOPacket("CT", {ui_ooc_chat_name->text(), "/status " + casestatus}));
+      ao_app->send_server_packet(new AOPacket("CT", {ooc_name, "/status " + casestatus}));
     }
     if (!cmdoc.isEmpty())
       append_server_chatmessage(
@@ -5111,7 +5115,7 @@ void Courtroom::on_ooc_return_pressed()
     }
     QSettings casefile(get_base_path() + "/cases/" + command[1] + ".ini",
                        QSettings::IniFormat);
-    casefile.setValue("author", ui_ooc_chat_name->text());
+    casefile.setValue("author", ooc_name);
     casefile.setValue("cmdoc", "");
     casefile.setValue("doc", "");
     casefile.setValue("status", command[2]);
@@ -5137,7 +5141,7 @@ void Courtroom::on_ooc_return_pressed()
   }
 
   QStringList packet_contents;
-  packet_contents.append(ui_ooc_chat_name->text());
+  packet_contents.append(ooc_name);
   packet_contents.append(ooc_message);
 
   AOPacket *f_packet = new AOPacket("CT", packet_contents);

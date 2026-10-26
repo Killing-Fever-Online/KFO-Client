@@ -2,6 +2,7 @@
 
 #include "aoapplication.h"
 #include "aopacket.h"
+#include "courtroom.h"
 #include "moderation_functions.h"
 #include "options.h"
 #include "widgets/moderator_dialog.h"
@@ -72,6 +73,18 @@ void PlayerListWidget::updatePlayer(const PlayerUpdate &update)
   case PlayerUpdate::AREA_ID:
     player.area_id = update.data.toInt();
     break;
+
+  case PlayerUpdate::DESC:
+    player.desc = update.data;
+    break;
+
+  case PlayerUpdate::FORMAT:
+    player.format = update.data;
+    break;
+
+  case PlayerUpdate::COMMANDS:
+    player.commands = update.data.split("&");
+    break;
   }
   updatePlayer(player.id, update_icon);
 
@@ -132,20 +145,56 @@ void PlayerListWidget::onCustomContextMenuRequested(const QPoint &pos)
   QMenu *menu = new QMenu(this);
   menu->setAttribute(Qt::WA_DeleteOnClose);
 
+  PlayerData player_data = m_player_map.value(id);
+
   if (id == m_paired_player_id)
   {
     QAction *unpair_action = menu->addAction(tr("Unpair"));
     connect(unpair_action, &QAction::triggered, this,
             [this] { Q_EMIT pairRequested(-1, QString()); });
   }
-  else if (!m_player_map.value(id).character.isEmpty())
+  else if (!player_data.character.isEmpty())
   {
-    const QString character = m_player_map.value(id).character;
+    const QString character = player_data.character;
     QAction *pair_action = menu->addAction(tr("Pair with %1").arg(name));
     connect(pair_action, &QAction::triggered, this, [this, id, character] {
       Q_EMIT pairRequested(id, character);
     });
   }
+
+  // Special server-defined commands
+  if (!player_data.commands.isEmpty())
+  {
+    // Separator for the commands
+    menu->addSeparator();
+    for (const QString &command : player_data.commands) {
+      QStringList split = command.split("{}");
+      QString send_command = split[0];
+      QString action_name = send_command;
+
+      // Separator provided so we also get a command name
+      if (split.size() > 0)
+      {
+        action_name = split[0];
+        send_command = split[1];
+      }
+
+      send_command = send_command
+          .replace("{id}", QString::number(player_data.id))
+          .replace("{character}", player_data.character)
+          .replace("{displayname}", player_data.character_name)
+          .replace("{username}", player_data.name)
+          .replace("{desc}", player_data.desc);
+      QAction *custom_command_action = menu->addAction(action_name);
+      connect(custom_command_action, &QAction::triggered, this, [this, send_command] {
+        ao_app->send_server_packet(
+            new AOPacket("CT", {ao_app->w_courtroom->ooc_name, send_command}));
+      });
+    }
+  }
+
+  // Separator for the administrative section
+  menu->addSeparator();
 
   QAction *report_player_action = menu->addAction("Report Player");
   connect(report_player_action, &QAction::triggered, this, [this, id, name] {
@@ -276,18 +325,31 @@ void PlayerListWidget::updatePlayer(int playerId, bool updateIcon)
   {
     tooltip = QObject::tr("%1 aka %2").arg(data.character, data.character_name);
   }
-
+  tooltip += "\n" + data.desc;
   item->setToolTip(tooltip);
+}
+
+QString PlayerListWidget::playerlistFormatString() const
+{
+  if (m_format_string.isEmpty())
+    return Options::getInstance().playerlistFormatString();
+  return m_format_string;
 }
 
 QString PlayerListWidget::formatLabel(const PlayerData &data)
 {
   QString format = Options::getInstance().playerlistFormatString();
+
+  // Special formatting defined just for this entry
+  if (!data.format.isEmpty()) {
+    format = data.format;
+  }
+  // Make sure to replace the items as needed
   return format
       .replace("{id}", QString::number(data.id))
       .replace("{character}", data.character)
-      .replace("{displayname}",
-               data.character_name.isEmpty() ? "No Data" : data.character_name)
+      .replace("{displayname}", data.character_name)
       .replace("{username}", data.name)
+      .replace("{desc}", data.desc)
       .simplified();
 }

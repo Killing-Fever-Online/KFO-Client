@@ -31,6 +31,9 @@ public:
   // Records the character folder a player is currently using (their iniswap).
   void setPlayerIniswap(int playerId, const QString &iniswap);
 
+  QString playerlistFormatString() const;
+  void setPlayerlistFormatString(QString value);
+
 private:
   AOApplication *ao_app;
   QMap<int, PlayerData> m_player_map;
@@ -38,6 +41,9 @@ private:
   QPair<int, QPointer<ModeratorDialog>> active_moderator_menu;
   bool m_is_authenticated = false;
   int m_paired_player_id = -1;
+
+  QString m_format_string = "";
+
   QMap<int, QString> m_iniswap_map;
 
   void addPlayer(int playerId);

@@ -410,6 +410,8 @@ public:
   void set_judge_state(JudgeState new_state) { judge_state = new_state; }
   void set_judge_buttons() { show_judge_controls(ao_app->get_pos_is_judge(selected_side)); }
 
+  QString ooc_name = "";
+
   ~Courtroom();
 private:
   AOApplication *ao_app;
