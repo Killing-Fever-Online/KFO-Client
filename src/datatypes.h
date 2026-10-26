@@ -89,6 +89,9 @@ struct PlayerData {
   QString character;
   QString character_name;
   int area_id = 0;
+  QString desc;
+  QString format;
+  QStringList commands;
 };
 
 struct PlayerRegister {
@@ -107,6 +110,9 @@ struct PlayerUpdate {
     CHARACTER,
     CHARACTER_NAME,
     AREA_ID,
+    DESC,
+    FORMAT,
+    COMMANDS,
   };
 
   int id;

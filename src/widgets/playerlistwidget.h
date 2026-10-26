@@ -26,6 +26,13 @@ public:
   void reloadPlayers();
 
   void setAuthenticated(bool f_state);
+  // Highlights the player currently selected for pairing (-1 clears it).
+  void setPairedPlayer(int playerId);
+  // Records the character folder a player is currently using (their iniswap).
+  void setPlayerIniswap(int playerId, const QString &iniswap);
+
+  QString playerlistFormatString() const;
+  void setPlayerlistFormatString(QString value);
 
 private:
   AOApplication *ao_app;
@@ -33,6 +40,11 @@ private:
   QMap<int, QListWidgetItem *> m_item_map;
   QPair<int, QPointer<ModeratorDialog>> active_moderator_menu;
   bool m_is_authenticated = false;
+  int m_paired_player_id = -1;
+
+  QString m_format_string = "";
+
+  QMap<int, QString> m_iniswap_map;
 
   void addPlayer(int playerId);
   void removePlayer(int playerId);
@@ -44,6 +56,9 @@ private:
 
 Q_SIGNALS:
   void notify(const QString &message);
+  // Emitted from the context menu to pair with a player. A negative playerId
+  // clears the current pairing.
+  void pairRequested(int playerId, const QString &character);
 
 private Q_SLOTS:
   void onCustomContextMenuRequested(const QPoint &pos);

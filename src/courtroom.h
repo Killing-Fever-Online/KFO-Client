@@ -93,7 +93,6 @@ public:
   void append_area(QString f_area) { area_list.append(f_area); }
   void clear_chars() { char_list.clear(); }
   void clear_mute() { ui_mute_list->clear(); }
-  void clear_pair_list() { ui_pair_list->clear(); }
   void clear_music() { music_list.clear(); }
   void clear_areas() { area_list.clear(); }
 
@@ -199,9 +198,6 @@ public:
 
   // sets the local mute list based on characters available on the server
   void set_mute_list();
-
-  // Sets the local pair list based on the characters available on the server.
-  void set_pair_list();
 
   // sets desk and bg based on pos in chatmessage
   void set_scene(bool show_desk, QString f_side);
@@ -414,6 +410,8 @@ public:
   void set_judge_state(JudgeState new_state) { judge_state = new_state; }
   void set_judge_buttons() { show_judge_controls(ao_app->get_pos_is_judge(selected_side)); }
 
+  QString ooc_name = "";
+
   ~Courtroom();
 private:
   AOApplication *ao_app;
@@ -464,6 +462,9 @@ private:
 
   // 0 = in front, 1 = behind
   int pair_order = 0;
+
+  // True when the theme defines the standard AO2 2.11 "player_list" position.
+  bool player_list_themed = false;
 
   // RP clock
   int m_current_clock = 0;
@@ -798,7 +799,6 @@ private:
   AOImage *ui_rp_clock;
 
   AOButton *ui_pair_button;
-  QListWidget *ui_pair_list;
   QSpinBox *ui_pair_offset_spinbox;
   QSpinBox *ui_pair_vert_offset_spinbox;
 
@@ -989,7 +989,7 @@ private slots:
   void chat_tick();
 
   void on_mute_list_clicked(QModelIndex p_index);
-  void on_pair_list_clicked(QModelIndex p_index);
+  void on_player_pair_requested(int playerId, const QString &character);
 
   void on_ooc_return_pressed();
   void on_ooc_commands_load(bool file_load, QString filename);

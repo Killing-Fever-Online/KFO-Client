@@ -262,7 +262,6 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
     if (!courtroom_constructed)
       goto end;
     w_courtroom->clear_chars();
-    w_courtroom->clear_pair_list();
     w_courtroom->clear_mute();
     for (int n_element = 0; n_element < f_contents.size(); ++n_element) {
       QStringList sub_elements = f_contents.at(n_element).split("&");
