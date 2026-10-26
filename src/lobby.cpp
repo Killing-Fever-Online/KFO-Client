@@ -37,10 +37,8 @@ Lobby::Lobby(AOApplication *p_ao_app, NetworkManager *p_net_manager)
   net_manager = p_net_manager;
 
   if (Options::getInstance().autoUpdates()) {
-    // Automatic updates are only supported on Windows, currently.
-#if defined(Q_OS_WIN)
-    ShellExecute(0, 0, TEXT("update.bat"), 0, 0, SW_SHOW);
-#endif
+    // no auto updates for you
+    // TODO: deprecate the option
   }
 
   loadUI();
