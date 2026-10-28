@@ -139,7 +139,7 @@ if(WIN32)
 endif()
 
 if(APPLE)
-    set(MACOSX_BUNDLE_ICON "${CMAKE_CURRENT_LIST_DIR}/data/logo_kfo.icns")
+    set(MACOSX_BUNDLE_ICON "${CMAKE_CURRENT_LIST_DIR}/resource/logo_kfo.icns")
     target_sources(Attorney_Online PRIVATE ${MACOSX_BUNDLE_ICON})
     set_source_files_properties(${MACOSX_BUNDLE_ICON} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources)
