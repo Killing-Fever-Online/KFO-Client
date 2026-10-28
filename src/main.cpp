@@ -40,9 +40,22 @@ int main(int argc, char *argv[])
   // Bundle the emoji font with the application instead of relying on the host
   // system to provide one (Windows has Segoe UI Emoji, minimal Linux installs
   // frequently have no emoji font at all).
-  if (QFontDatabase::addApplicationFont(":/resource/fonts/NotoColorEmoji.ttf") ==
-      -1) {
+  const int emoji_font_id =
+      QFontDatabase::addApplicationFont(":/resource/fonts/NotoColorEmoji.ttf");
+  if (emoji_font_id == -1) {
     qWarning() << "Failed to load bundled emoji font";
+  }
+  else {
+    const QStringList emoji_families =
+        QFontDatabase::applicationFontFamilies(emoji_font_id);
+    for (const QString &family : emoji_families) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+      QFontDatabase::addApplicationEmojiFontFamily(family);
+#else
+      QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Common,
+                                                       family);
+#endif
+    }
   }
 
   QFont main_font = main_app.font();

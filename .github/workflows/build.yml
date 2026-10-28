@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 6.8.3
+          - 6.9.3
         platform:
           - linux
           - windows
@@ -241,7 +241,7 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
             -DAO_ENABLE_DISCORD_RPC=OFF
 
       - name: Build (Linux)
