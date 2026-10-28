@@ -551,7 +551,8 @@ void Options::setPlayerCountOptout(bool value)
 
 bool Options::playSelectedSFXOnIdle() const
 {
-  return config.value("sfx_on_idle", false).toBool();
+  // Why was this flipped false by default?!?!?
+  return config.value("sfx_on_idle", true).toBool();
 }
 
 void Options::setPlaySelectedSFXOnIdle(bool value)
