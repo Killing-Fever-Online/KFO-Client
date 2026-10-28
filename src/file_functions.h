@@ -12,4 +12,8 @@ bool exists(QString p_path);
 QString get_app_dir_path();
 QString get_base_path();
 
+// macOS only: on first run, copy the default base bundled in the .app into the
+// writable Application Support location. No-op on other platforms.
+void seed_base_if_missing();
+
 #endif // FILE_FUNCTIONS_H

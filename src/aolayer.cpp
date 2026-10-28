@@ -103,14 +103,15 @@ void AOLayer::set_frame(QPixmap f_pixmap)
 }
 
 void AOLayer::center_pixmap(QPixmap f_pixmap) {
-  QLabel::move(
-      x + (f_w - f_pixmap.width()) / 2,
-      y + (f_h - f_pixmap.height())); // Always center horizontally, always put
-                                      // at the bottom vertically
-  if (masked)
-      this->setMask(
-          QRegion((f_pixmap.width() - f_w) / 2, (f_pixmap.height() - f_h) / 2, f_w,
-                  f_h)); // make sure we don't escape the area we've been given
+  this->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
+
+  QLabel::move(x, y);
+
+  // The mask just needs to be the size of the viewport.
+  // QLabel will automatically clip any parts of the image that overflow the widget.
+  if (masked) {
+    this->setMask(QRegion(0, 0, f_w, f_h));
+  }
 }
 
 void AOLayer::combo_resize(int w, int h)

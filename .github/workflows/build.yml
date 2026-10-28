@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 6.8.3
+          - 6.9.3
         platform:
           - linux
           - windows
@@ -30,6 +30,13 @@ jobs:
             target: desktop
             arch: win64_msvc2022_64
             modules: 'qtimageformats qtwebsockets qtmultimedia'
+
+          - platform: macos
+            os: macos-14
+            target: desktop
+            arch: clang_64
+            modules: 'qtimageformats qtwebsockets qtmultimedia'
+            version: 6.9.3
 
     runs-on: ${{ matrix.os }}
 
@@ -149,6 +156,34 @@ jobs:
           test -f lib/bassmidi.h
           test -f lib/bassopus.h
 
+      - name: Install macOS BASS
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          mkdir -p lib bin macdeps/bass macdeps/bassmidi macdeps/bassopus
+
+          curl -sL http://www.un4seen.com/files/bass24-osx.zip -o macdeps/bass.zip
+          unzip -o -d macdeps/bass macdeps/bass.zip
+          cp ./macdeps/bass/c/bass.h ./lib/
+          cp ./macdeps/bass/libbass.dylib ./lib/
+
+          curl -sL http://www.un4seen.com/files/bassmidi24-osx.zip -o macdeps/bassmidi.zip
+          unzip -o -d macdeps/bassmidi macdeps/bassmidi.zip
+          cp ./macdeps/bassmidi/c/bassmidi.h ./lib/
+          cp ./macdeps/bassmidi/libbassmidi.dylib ./lib/
+
+          curl -sL http://www.un4seen.com/files/bassopus24-osx.zip -o macdeps/bassopus.zip
+          unzip -o -d macdeps/bassopus macdeps/bassopus.zip
+          cp ./macdeps/bassopus/c/bassopus.h ./lib/
+          cp ./macdeps/bassopus/libbassopus.dylib ./lib/
+
+          test -f lib/bass.h
+          test -f lib/bassmidi.h
+          test -f lib/bassopus.h
+          test -f lib/libbass.dylib
+          test -f lib/libbassmidi.dylib
+          test -f lib/libbassopus.dylib
+
       # ----------------------------------------------------------------
       # QtApng
       # Updated QtApng fork with Qt 6 / CMake support.
@@ -167,6 +202,7 @@ jobs:
           mkdir -p ./bin/imageformats
           cd ./qtapng
           cmake . \
+            -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE="${{ github.workspace }}/bin/imageformats/" \
             -DAPNG_QT6=ON \
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
@@ -196,6 +232,18 @@ jobs:
             -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
             -DAO_ENABLE_DISCORD_RPC=ON
 
+      - name: Configure (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          command -v ninja >/dev/null 2>&1 || brew install ninja
+          cmake -B build -S . \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
+            -DAO_ENABLE_DISCORD_RPC=OFF
+
       - name: Build (Linux)
         if: matrix.platform == 'linux'
         shell: bash
@@ -204,6 +252,11 @@ jobs:
       - name: Build (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Build (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
         run: cmake --build build --config Release --parallel
 
       - name: Flatten Windows output
@@ -277,6 +330,37 @@ jobs:
           chmod +x Attorney_Online-Linux-x86_64.AppImage
 
       # ----------------------------------------------------------------
+      # Package — macOS
+      # ----------------------------------------------------------------
+      - name: Package macOS
+        if: matrix.platform == 'macos'
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -e
+          APP="bin/Attorney Online.app"
+          test -d "$APP"
+
+          cp lib/libbass.dylib lib/libbassmidi.dylib lib/libbassopus.dylib "$APP/Contents/MacOS/"
+
+          if [ -f bin/imageformats/libqapng.dylib ]; then
+            mkdir -p "$APP/Contents/PlugIns/imageformats"
+            cp bin/imageformats/libqapng.dylib "$APP/Contents/PlugIns/imageformats/"
+          fi
+
+          "${QT_ROOT_DIR}/bin/macdeployqt" "$APP" -verbose=1 -always-overwrite
+
+          codesign --force --sign - "$APP/Contents/MacOS/"*.dylib
+          if ls "$APP/Contents/PlugIns/imageformats/"*.dylib >/dev/null 2>&1; then
+            codesign --force --sign - "$APP/Contents/PlugIns/imageformats/"*.dylib
+          fi
+          codesign --force --deep --sign - "$APP"
+
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP" "dist/Attorney_Online-macOS-arm64.zip"
+
+      # ----------------------------------------------------------------
       # Upload artifacts
       # ----------------------------------------------------------------
       - name: Upload Linux artifact
@@ -292,3 +376,10 @@ jobs:
         with:
           name: Attorney_Online-${{ matrix.os }}-${{ matrix.platform }}
           path: ${{ github.workspace }}/bin/
+
+      - name: Upload macOS artifact
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v6
+        with:
+          name: Attorney_Online-${{ matrix.os }}-${{ matrix.platform }}
+          path: dist/Attorney_Online-macOS-arm64.zip

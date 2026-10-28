@@ -8,6 +8,7 @@
 #include "mediatester.h"
 
 #include <QDebug>
+#include <QFontDatabase>
 #include <QLibraryInfo>
 #include <QPluginLoader>
 #include <QTranslator>
@@ -17,9 +18,11 @@
 
 int main(int argc, char *argv[])
 {
+#ifndef Q_OS_MACOS
   if (qgetenv("QT_FONT_DPI").isEmpty()) {
       qputenv("QT_FONT_DPI", "96");
   }
+#endif
 
   qSetMessagePattern("%{type}: %{if-category}%{category}: %{endif}%{message}");
 
@@ -33,6 +36,27 @@ int main(int argc, char *argv[])
 
   AOApplication::addLibraryPath(AOApplication::applicationDirPath() + "/lib");
   QResource::registerResource(main_app.get_asset("themes/" + Options::getInstance().theme() + ".rcc"));
+
+  // Bundle the emoji font with the application instead of relying on the host
+  // system to provide one (Windows has Segoe UI Emoji, minimal Linux installs
+  // frequently have no emoji font at all).
+  const int emoji_font_id =
+      QFontDatabase::addApplicationFont(":/resource/fonts/NotoColorEmoji.ttf");
+  if (emoji_font_id == -1) {
+    qWarning() << "Failed to load bundled emoji font";
+  }
+  else {
+    const QStringList emoji_families =
+        QFontDatabase::applicationFontFamilies(emoji_font_id);
+    for (const QString &family : emoji_families) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+      QFontDatabase::addApplicationEmojiFontFamily(family);
+#else
+      QFontDatabase::addApplicationFallbackFontFamily(QChar::Script_Common,
+                                                       family);
+#endif
+    }
+  }
 
   QFont main_font = main_app.font();
   main_app.default_font = main_font;
