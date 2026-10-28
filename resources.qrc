@@ -56,5 +56,6 @@
         <file>resource/data_sample.avi</file>
         <file>resource/logo_kfo.ico</file>
         <file>resource/logo_kfo.png</file>
+        <file>resource/logo_kfo.icns</file>
     </qresource>
 </RCC>
