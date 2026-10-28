@@ -1,5 +1,8 @@
 #include "file_functions.h"
 
+#include <QProcess>
+#include <QStandardPaths>
+
 bool file_exists(QString file_path)
 {
   if (file_path.isEmpty())
@@ -29,7 +32,9 @@ bool exists(QString p_path)
 
 QString get_app_dir_path()
 {
-#ifdef Q_OS_LINUX
+#ifdef Q_OS_MACOS
+  return QCoreApplication::applicationDirPath() + "/../../../base/";
+#elif defined(Q_OS_LINUX)
   // When running from an AppImage, $APPIMAGE points to the .AppImage file.
   // Put "base/" next to the .AppImage so users can drop assets beside it.
   QByteArray appimage = qgetenv("APPIMAGE");
@@ -53,10 +58,27 @@ QString get_base_path()
     QString external_storage = getenv("EXTERNAL_STORAGE");
     base_path = external_storage + "/base/";
   }
-#elif defined(__APPLE__)
-  base_path = QCoreApplication::applicationDirPath() + "/../../../base/";
 #else
   base_path = get_app_dir_path() + "/base/";
 #endif
   return base_path;
+}
+
+void seed_base_if_missing()
+{
+#ifdef Q_OS_MACOS
+  const QString user_base = get_base_path();
+  if (dir_exists(user_base))
+    return;
+
+  // The default base is shipped read-only inside the app bundle. Copy it to
+  // the writable per-user location on first launch.
+  const QString bundled_base = QDir::cleanPath(
+      QCoreApplication::applicationDirPath() + "/../Resources/base");
+  if (!dir_exists(bundled_base))
+    return;
+
+  QDir().mkpath(QFileInfo(user_base).absolutePath());
+  QProcess::execute("ditto", {bundled_base, user_base});
+#endif
 }

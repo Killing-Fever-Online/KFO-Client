@@ -10,6 +10,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(AO_ENABLE_DISCORD_RPC "Enable Discord Rich Presence" ON)
 
@@ -135,4 +136,41 @@ if(WIN32)
     set(APP_ICON_RESOURCE_WINDOWS "${CMAKE_CURRENT_SOURCE_DIR}/resource/logo-client.rc")
     target_sources(Attorney_Online PRIVATE ${APP_ICON_RESOURCE_WINDOWS})
   endif()
+endif()
+
+if(APPLE)
+    set(MACOSX_BUNDLE_ICON "${CMAKE_CURRENT_LIST_DIR}/data/logo_kfo.icns")
+    target_sources(Attorney_Online PRIVATE ${MACOSX_BUNDLE_ICON})
+    set_source_files_properties(${MACOSX_BUNDLE_ICON} PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources)
+
+    set_target_properties(Attorney_Online PROPERTIES
+        OUTPUT_NAME "Attorney Online"
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "Attorney Online"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.attorneyonline.AttorneyOnline"
+        MACOSX_BUNDLE_BUNDLE_VERSION "2"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "2.0"
+        MACOSX_BUNDLE_ICON_FILE "logo_kfo.icns"
+    )
+
+    # Copy necessary resources/plugins into the bundle
+    if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/bin/imageformats/libqapng.dylib")
+        add_custom_command(TARGET Attorney_Online POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_DIR:Attorney_Online>/Contents/PlugIns/imageformats"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_LIST_DIR}/bin/imageformats/libqapng.dylib"
+                "$<TARGET_BUNDLE_DIR:Attorney_Online>/Contents/PlugIns/imageformats/"
+            VERBATIM
+        )
+    endif()
+
+    if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/bin/base")
+        add_custom_command(TARGET Attorney_Online POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_LIST_DIR}/bin/base"
+                "$<TARGET_BUNDLE_DIR:Attorney_Online>/Contents/Resources/base"
+            VERBATIM
+        )
+    endif()
 endif()

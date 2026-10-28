@@ -3,6 +3,7 @@
 #include "bassmidi.h"
 #include "courtroom.h"
 #include "debug_functions.h"
+#include "file_functions.h"
 #include "lobby.h"
 #include "networkmanager.h"
 #include "options.h"
@@ -22,6 +23,11 @@ void message_handler(QtMsgType type, const QMessageLogContext &context,
 
 AOApplication::AOApplication(int &argc, char **argv) : QApplication(argc, argv)
 {
+  setApplicationName("Attorney Online");
+  // On macOS, we distribute with a built-in base in the .app but this is not writeable
+  // so we copy the base folder into the preferred base path (~/Library/Application Support/Attorney Online)
+  seed_base_if_missing();
+
   net_manager = new NetworkManager(this);
   discord = new AttorneyOnline::Discord();
 

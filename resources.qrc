@@ -1,6 +1,8 @@
 <RCC>
     <qresource prefix="/">
         <file>resource/fonts/Ace-Attorney.ttf</file>
+        <file>resource/fonts/NotoColorEmoji.ttf</file>
+        <file>resource/fonts/NotoColorEmoji.LICENSE.txt</file>
         <file>resource/logo_ao2.png</file>
         <file>resource/translations/ao_de.qm</file>
         <file>resource/translations/ao_en.qm</file>

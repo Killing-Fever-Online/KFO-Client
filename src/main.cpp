@@ -18,9 +18,11 @@
 
 int main(int argc, char *argv[])
 {
+#ifndef Q_OS_MACOS
   if (qgetenv("QT_FONT_DPI").isEmpty()) {
       qputenv("QT_FONT_DPI", "96");
   }
+#endif
 
   qSetMessagePattern("%{type}: %{if-category}%{category}: %{endif}%{message}");
 
