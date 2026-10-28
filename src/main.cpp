@@ -8,6 +8,7 @@
 #include "mediatester.h"
 
 #include <QDebug>
+#include <QFontDatabase>
 #include <QLibraryInfo>
 #include <QPluginLoader>
 #include <QTranslator>
@@ -33,6 +34,14 @@ int main(int argc, char *argv[])
 
   AOApplication::addLibraryPath(AOApplication::applicationDirPath() + "/lib");
   QResource::registerResource(main_app.get_asset("themes/" + Options::getInstance().theme() + ".rcc"));
+
+  // Bundle the emoji font with the application instead of relying on the host
+  // system to provide one (Windows has Segoe UI Emoji, minimal Linux installs
+  // frequently have no emoji font at all).
+  if (QFontDatabase::addApplicationFont(":/resource/fonts/NotoColorEmoji.ttf") ==
+      -1) {
+    qWarning() << "Failed to load bundled emoji font";
+  }
 
   QFont main_font = main_app.font();
   main_app.default_font = main_font;
