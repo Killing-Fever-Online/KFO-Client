@@ -41,3 +41,4 @@ server/__pycache__
 discord/
 
 .vscode/
+compile_commands.json

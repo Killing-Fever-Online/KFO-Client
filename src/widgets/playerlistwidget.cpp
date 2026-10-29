@@ -62,7 +62,6 @@ void PlayerListWidget::updatePlayer(const PlayerUpdate &update)
 
   case PlayerUpdate::CHARACTER:
     player.character = update.data;
-    m_iniswap_map.remove(update.id); // Iniswaps are tied to the base character.
     update_icon = true;
     break;
 
@@ -113,14 +112,6 @@ void PlayerListWidget::setPairedPlayer(int playerId)
   }
 }
 
-void PlayerListWidget::setPlayerIniswap(int playerId, const QString &iniswap)
-{
-  m_iniswap_map.insert(playerId, iniswap);
-  if (m_player_map.contains(playerId))
-  {
-    updatePlayer(playerId, true);
-  }
-}
 
 void PlayerListWidget::setAuthenticated(bool f_state)
 {
@@ -234,7 +225,6 @@ void PlayerListWidget::onCustomContextMenuRequested(const QPoint &pos)
 
 void PlayerListWidget::addPlayer(int playerId)
 {
-  m_iniswap_map.remove(playerId);
   m_player_map.insert(playerId, PlayerData{.id = playerId});
   QListWidgetItem *item = new QListWidgetItem(this);
   item->setData(Qt::UserRole, playerId);
@@ -257,7 +247,6 @@ void PlayerListWidget::removePlayer(int playerId)
 
   delete takeItem(row(m_item_map.take(playerId)));
   m_player_map.remove(playerId);
-  m_iniswap_map.remove(playerId);
 }
 
 void PlayerListWidget::filterPlayerList()
@@ -271,9 +260,11 @@ void PlayerListWidget::filterPlayerList()
                     "either a broken server-implementation or a bad demo file.";
       break;
     }
-    item->setHidden(m_player_map[item->data(Qt::UserRole).toInt()].area_id !=
-                        area_id &&
-                    !m_is_authenticated);
+    // ?????? so we just "dude trust me" that we're not gonna peek with a modded client?
+    // Servers just shouldn't send us this data at all.
+    // item->setHidden(m_player_map[item->data(Qt::UserRole).toInt()].area_id !=
+    //                     area_id &&
+    //                 !m_is_authenticated);
   }
 }
 
@@ -298,15 +289,8 @@ void PlayerListWidget::updatePlayer(int playerId, bool updateIcon)
 
   if (updateIcon)
   {
-    // Prefer the iniswap's icon, then the base character's, then none.
     QString icon_path;
-    const QString iniswap = m_iniswap_map.value(playerId);
-    if (!iniswap.isEmpty())
-    {
-      icon_path = ao_app->get_image_suffix(
-          ao_app->get_character_path(iniswap, "char_icon"), true);
-    }
-    if (icon_path.isEmpty() && !data.character.isEmpty())
+    if (!data.character.isEmpty())
     {
       icon_path = ao_app->get_image_suffix(
           ao_app->get_character_path(data.character, "char_icon"), true);

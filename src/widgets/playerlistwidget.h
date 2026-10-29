@@ -28,8 +28,6 @@ public:
   void setAuthenticated(bool f_state);
   // Highlights the player currently selected for pairing (-1 clears it).
   void setPairedPlayer(int playerId);
-  // Records the character folder a player is currently using (their iniswap).
-  void setPlayerIniswap(int playerId, const QString &iniswap);
 
   QString playerlistFormatString() const;
   void setPlayerlistFormatString(QString value);
@@ -43,8 +41,6 @@ private:
   int m_paired_player_id = -1;
 
   QString m_format_string = "";
-
-  QMap<int, QString> m_iniswap_map;
 
   void addPlayer(int playerId);
   void removePlayer(int playerId);

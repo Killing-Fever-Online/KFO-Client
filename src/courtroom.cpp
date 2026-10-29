@@ -2686,14 +2686,6 @@ void Courtroom::unpack_chatmessage(QStringList p_contents)
     }
   }
 
-  // Keep the player list icon in sync with the character (including iniswaps)
-  // each player is currently using. CHAR_NAME is the folder actually shown.
-  bool speaker_id_ok = false;
-  const int speaker_id = m_chatmessage[CHAR_ID].toInt(&speaker_id_ok);
-  if (speaker_id_ok && !m_chatmessage[CHAR_NAME].isEmpty()) {
-    ui_player_list->setPlayerIniswap(speaker_id, m_chatmessage[CHAR_NAME]);
-  }
-
   // if the char ID matches our client's char ID (most likely, this is our message coming back to us)
   bool sender = Options::getInstance().desynchronisedLogsEnabled() || m_chatmessage[CHAR_ID].toInt() == m_cid;
 
