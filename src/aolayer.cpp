@@ -337,11 +337,18 @@ void AOLayer::start_playback(QString p_image)
 #endif
   m_reader.setFileName(p_image);
   if (!m_reader.canRead()) {
+#ifdef DEBUG_MOVIE
+    qDebug() << "[AOLayer::start_playback] Warning! Can't read image:" << p_image;
+#endif
       this->kill();
       return;
   }
   last_max_frames = max_frames;
   max_frames = m_reader.imageCount();
+  // 0 frames means non-animated image. This changed since qt5 for webp's.
+  // manually set it to 1 so nothing breaks.
+  if (max_frames == 0)
+    max_frames = 1;
   if (m_reader.loopCount() == 0 && max_frames > 1)
     play_once = true;
   if (!continuous
@@ -356,6 +363,9 @@ void AOLayer::start_playback(QString p_image)
   #else
   frame_loader = QtConcurrent::run(thread_pool, &AOLayer::populate_vectors, this);
   #endif
+#ifdef DEBUG_MOVIE
+  qDebug() << "[AOLayer::start_playback] loading frames:" << frame << "/" << max_frames;
+#endif
   last_path = p_image;
   while (movie_frames.size() <= frame) // if we haven't loaded the frame we need yet
     frameAdded.wait(&mutex); // wait for the frame loader to add another frame, then check again
@@ -583,13 +593,21 @@ void AOLayer::movie_ticker()
   }
 #ifdef DEBUG_MOVIE
   qDebug() << "[AOLayer::movie_ticker] Frame:" << frame << "Delay:" << movie_delays[frame]
-           << "Actual time taken from last frame:" << actual_time.restart();
+           << "Actual time taken from last frame:" << actual_time.restart()
+           << "Animation name:" << m_reader.fileName();
 #endif
   this->set_frame(movie_frames[frame]);
   ticker->setInterval(this->get_frame_delay(movie_delays[frame]));
 }
 
 void AOLayer::populate_vectors() {
+  if (max_frames == 0)
+  {
+#ifdef DEBUG_MOVIE
+    qDebug() << "[AOLayer::populate_vectors] WARNING: 0 frame animation passed. Exiting loop";
+#endif
+    return;
+  }
 #ifdef DEBUG_MOVIE
   qDebug() << "[AOLayer::populate_vectors] Started thread";
 #endif
