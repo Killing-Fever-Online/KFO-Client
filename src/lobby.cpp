@@ -539,11 +539,20 @@ void Lobby::list_demos()
 
 void Lobby::get_motd()
 {
-  net_manager->request_document(MSDocumentType::Motd, [this](QString document) {
-    if (document.isEmpty()) {
-      document = tr("Couldn't get the message of the day.");
+  // Create a weak QPointer of lobby because otherwise if we join a server too fast
+  // before the motd loads we'll just segfault trying to show it.
+  QPointer<Lobby> lobby(this);
+
+  net_manager->request_document(MSDocumentType::Motd, [lobby](QString document) {
+    // If the lobby was destructed while the request was pending,
+    // lobby will automatically evaluate to nullptr.
+    if (!lobby) {
+      return;
     }
-    ui_motd_text->setHtml(document);
+    if (document.isEmpty()) {
+      document = lobby->tr("Couldn't get the message of the day.");
+    }
+    lobby->ui_motd_text->setHtml(document);
   });
 }
 
