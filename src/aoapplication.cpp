@@ -140,37 +140,73 @@ QString AOApplication::get_version_string()
 
 void AOApplication::server_disconnected()
 {
-  if (courtroom_constructed) {
+  if (m_reconnecting)
+      return;
+
+  if (!courtroom_constructed)
+      return;
+
+  bool first_attempt = true;
+
+  while (true)
+  {
     QMessageBox msgBox;
-    msgBox.setText(tr("Disconnected from server."));
-    QPushButton* btn1 = msgBox.addButton(tr("Return to Lobby"), QMessageBox::AcceptRole);
-    QPushButton* btn2 = msgBox.addButton(tr("Reconnect"), QMessageBox::AcceptRole);
-    msgBox.setDefaultButton(btn1);
+    msgBox.setText(first_attempt
+                    ? tr("Disconnected from server.")
+                    : tr("Failed to reconnect to server."));
+    QPushButton *btn_lobby =
+        msgBox.addButton(tr("Return to Lobby"), QMessageBox::RejectRole);
+    QPushButton *btn_reconnect =
+        msgBox.addButton(tr("Reconnect"), QMessageBox::AcceptRole);
+    msgBox.setDefaultButton(btn_lobby);
     msgBox.exec();
-    if (msgBox.clickedButton() == btn1) {
-        construct_lobby();
-        destruct_courtroom();
-    } else if (msgBox.clickedButton() == btn2) {
-      net_manager->connect_to_server(net_manager->last_server_chosen);
-      QTimer::singleShot(4000, this, [this]() {
-          if (net_manager->established_connection) {
-              net_manager->join_to_server();
-              QString hdid = get_hdid();
-              send_server_packet(new AOPacket("RM"));
-              send_server_packet(new AOPacket("CC", {QString::number(client_id),
-                            QString::number(w_courtroom->get_cid()), hdid}));
-              call_notice(tr("Success reconnecting to server."));
-              // send_server_packet(new AOPacket("MC", w_courtroom->last_area_entered));
-          } else {
-              call_notice(tr("Failed to reconnect to server."));
-              construct_lobby();
-              destruct_courtroom();
-          }
-        qDebug() << net_manager->established_connection;
-      });
+    m_reconnecting = false;
+    if (msgBox.clickedButton() == btn_lobby)
+    {
+      Options::getInstance().setServerSubTheme(QString());
+      construct_lobby();
+      destruct_courtroom();
+      return;
     }
+    // Reconnect has been chosen! Make sure we're marked as reconnecting.
+    first_attempt = false;
+    m_reconnecting = true;
+    net_manager->connect_to_server(net_manager->last_server_chosen);
+
+    // Make sure to do an event loop just in case we quit out early
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+
+    bool success = false;
+    const QMetaObject::Connection conn =
+        connect(net_manager, &NetworkManager::server_connected, this,
+                [&](bool state) {
+                    success = state;
+                    loop.quit();
+                });
+    connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+    // Timeout in 10 seconds
+    timeout.start(10'000);
+
+    loop.exec();
+
+    disconnect(conn);
+    m_reconnecting = false;
+
+    if (success)
+    {
+      net_manager->join_to_server();
+      const QString hdid = get_hdid();
+      send_server_packet(new AOPacket("RD"));
+      send_server_packet(new AOPacket("CC", {QString::number(client_id),
+                                              QString::number(w_courtroom->get_cid()),
+                                              hdid}));
+      call_notice(tr("Success reconnecting to server."), 0);
+      return;
+    }
+    // If failed or timed out, re-show the same notice
   }
-  Options::getInstance().setServerSubTheme(QString());
 }
 
 void AOApplication::loading_cancelled()

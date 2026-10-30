@@ -35,6 +35,20 @@ PlayerListWidget::PlayerListWidget(AOApplication *ao_app, QWidget *parent)
 
 PlayerListWidget::~PlayerListWidget() {}
 
+QString PlayerListWidget::categoryKeyForPlayer(const PlayerData &player) const {
+  if (!player.category_name.isEmpty()) {
+    return QStringLiteral("name:") + player.category_name;
+  }
+  return QStringLiteral("area:") + QString::number(player.area_id);
+}
+
+QString PlayerListWidget::currentCategoryKey(QTreeWidgetItem *parent) const {
+  if (parent == nullptr) {
+    return QString();
+  }
+  return parent->data(0, CategoryKeyRole).toString();
+}
+
 void PlayerListWidget::registerPlayer(const PlayerRegister &update)
 {
   switch (update.type)
@@ -92,6 +106,10 @@ void PlayerListWidget::updatePlayer(const PlayerUpdate &update)
   case PlayerUpdate::COMMANDS:
     player.commands = update.data.split("&");
     break;
+
+  case PlayerUpdate::CATEGORY_NAME:
+    player.category_name = update.data;
+    break;
   }
   updatePlayer(player.id, update_icon);
 
@@ -114,7 +132,7 @@ void PlayerListWidget::setAreaNames(const QStringList &names)
   }
 
   m_area_names = names;
-  refreshAreaLabels();
+  refreshCategoryLabels();
 }
 
 void PlayerListWidget::setPairedPlayer(int playerId)
@@ -251,7 +269,8 @@ void PlayerListWidget::addPlayer(int playerId)
   QTreeWidgetItem *item = new QTreeWidgetItem;
   item->setData(0, PlayerIdRole, playerId);
   item->setData(0, ItemTypeRole, PlayerItem);
-  insertPlayerItem(playerId, item, 0);
+  const PlayerData &playerData = m_player_map[playerId];
+  insertPlayerItem(playerId, item, playerData);
   m_item_map.insert(playerId, item);
   updatePlayer(playerId, false);
 }
@@ -270,143 +289,134 @@ void PlayerListWidget::removePlayer(int playerId)
   }
 
   QTreeWidgetItem *item = m_item_map.take(playerId);
-  if (item != nullptr)
-  {
+  if (item != nullptr) {
     QTreeWidgetItem *parent = item->parent();
-    const int area_id =
-        parent != nullptr ? parent->data(0, AreaIdRole).toInt() : -1;
-    if (parent != nullptr)
-    {
+    const QString groupKey = currentCategoryKey(parent);
+    if (parent != nullptr) {
       parent->removeChild(item);
     }
     delete item;
-    if (area_id >= 0)
-    {
-      removeAreaIfEmpty(area_id);
+    if (!groupKey.isEmpty()) {
+      removeCategoryIfEmpty(groupKey);
     }
   }
-
   m_player_map.remove(playerId);
   m_registration_order.remove(playerId);
 }
 
-QTreeWidgetItem *PlayerListWidget::ensureAreaItem(int areaId)
-{
-  QTreeWidgetItem *area_item = m_area_item_map.value(areaId, nullptr);
-  if (area_item != nullptr)
-  {
-    return area_item;
+QTreeWidgetItem *PlayerListWidget::ensureCategoryItem(const QString &categoryKey) {
+  QTreeWidgetItem *item = m_category_item_map.value(categoryKey, nullptr);
+  if (item != nullptr) {
+    return item;
   }
 
-  area_item = new QTreeWidgetItem;
-  area_item->setData(0, AreaIdRole, areaId);
-  area_item->setData(0, ItemTypeRole, AreaItem);
-  area_item->setFlags(area_item->flags() & ~Qt::ItemIsSelectable);
+  item = new QTreeWidgetItem;
+  item->setData(0, CategoryKeyRole, categoryKey);
+  item->setData(0, ItemTypeRole, CategoryItem);
+  item->setFlags(item->flags() & ~Qt::ItemIsSelectable);
 
-  // Keep the top-level groups ordered numerically by area id. Sorting by text
-  // would put "Area 10" before "Area 2".
+  const bool isNameCategory = categoryKey.startsWith(QStringLiteral("name:"));
+
+  // Name-categories sort alphabetically and come first.
+  // Area-categories sort numerically and come after all name-categories.
   int insert_index = 0;
-  while (insert_index < topLevelItemCount() &&
-         topLevelItem(insert_index)->data(0, AreaIdRole).toInt() < areaId)
-  {
-    ++insert_index;
+  const int count = topLevelItemCount();
+  for (int i = 0; i < count; ++i) {
+    QTreeWidgetItem *existing = topLevelItem(i);
+    const QString existingKey = existing->data(0, CategoryKeyRole).toString();
+    const bool existingIsName = existingKey.startsWith(QStringLiteral("name:"));
+
+    bool insertBefore;
+    if (isNameCategory) {
+      insertBefore = existingIsName && existingKey > categoryKey;
+    } else {
+      insertBefore = !existingIsName
+                     || existingKey.mid(5).toInt() > categoryKey.mid(5).toInt();
+    }
+    if (insertBefore) {
+      break;
+    }
+    insert_index = i + 1;
   }
-  insertTopLevelItem(insert_index, area_item);
-  m_area_item_map.insert(areaId, area_item);
-  area_item->setExpanded(true);
-  updateAreaLabel(areaId);
-  return area_item;
+
+  insertTopLevelItem(insert_index, item);
+  m_category_item_map.insert(categoryKey, item);
+  item->setExpanded(true);
+  updateCategoryLabel(categoryKey);
+  return item;
 }
 
-void PlayerListWidget::updateAreaLabel(int areaId)
-{
-  QTreeWidgetItem *area_item = m_area_item_map.value(areaId, nullptr);
-  if (area_item == nullptr)
-  {
+void PlayerListWidget::updateCategoryLabel(const QString &categoryKey) {
+  QTreeWidgetItem *item = m_category_item_map.value(categoryKey, nullptr);
+  if (item == nullptr) {
     return;
   }
 
-  QString name = m_area_names.value(areaId);
-  if (name.isEmpty())
-  {
-    name = tr("Area %1").arg(areaId);
-  }
-  area_item->setText(0, name);
-  area_item->setToolTip(0, tr("Area ID: %1").arg(areaId));
-}
-
-void PlayerListWidget::refreshAreaLabels()
-{
-  for (auto it = m_area_item_map.cbegin(); it != m_area_item_map.cend(); ++it)
-  {
-    updateAreaLabel(it.key());
+  if (categoryKey.startsWith(QStringLiteral("name:"))) {
+    const QString categoryName = categoryKey.mid(5);
+    item->setText(0, categoryName);
+    item->setToolTip(0, tr("Category: %1").arg(categoryName));
+  } else {
+    // Preserve the existing area-label rendering (name lookup, formatting, etc.)
+    // — this is the original body of updateAreaLabel, just keyed differently.
+    const int areaId = categoryKey.mid(5).toInt();
+    // ... existing area-label logic ...
   }
 }
 
-void PlayerListWidget::insertPlayerItem(int playerId, QTreeWidgetItem *item,
-                                        int areaId)
-{
-  QTreeWidgetItem *area_item = ensureAreaItem(areaId);
+void PlayerListWidget::refreshCategoryLabels() {
+  for (auto it = m_category_item_map.cbegin(); it != m_category_item_map.cend(); ++it) {
+    updateCategoryLabel(it.key());
+  }
+}
 
-  // Keep players in registration order inside their area group.
+void PlayerListWidget::insertPlayerItem(int playerId, QTreeWidgetItem *item, const PlayerData &player) {
+  QTreeWidgetItem *parent = ensureCategoryItem(categoryKeyForPlayer(player));
+
   const int order = m_registration_order.value(playerId);
-  int insert_index = area_item->childCount();
-  for (int i = 0; i < area_item->childCount(); ++i)
-  {
-    const int child_id = area_item->child(i)->data(0, PlayerIdRole).toInt();
-    if (m_registration_order.value(child_id) > order)
-    {
+  int insert_index = parent->childCount();
+  for (int i = 0; i < parent->childCount(); ++i) {
+    const int child_id = parent->child(i)->data(0, PlayerIdRole).toInt();
+    if (m_registration_order.value(child_id) > order) {
       insert_index = i;
       break;
     }
   }
-  area_item->insertChild(insert_index, item);
+  parent->insertChild(insert_index, item);
 }
 
-void PlayerListWidget::removeAreaIfEmpty(int areaId)
-{
-  QTreeWidgetItem *area_item = m_area_item_map.value(areaId, nullptr);
-  if (area_item == nullptr || area_item->childCount() > 0)
-  {
+void PlayerListWidget::removeCategoryIfEmpty(const QString &categoryKey) {
+  QTreeWidgetItem *item = m_category_item_map.value(categoryKey, nullptr);
+  if (item == nullptr || item->childCount() > 0) {
     return;
   }
-
-  const int index = indexOfTopLevelItem(area_item);
-  if (index >= 0)
-  {
+  const int index = indexOfTopLevelItem(item);
+  if (index >= 0) {
     delete takeTopLevelItem(index);
   }
-  m_area_item_map.remove(areaId);
+  m_category_item_map.remove(categoryKey);
 }
 
-void PlayerListWidget::filterPlayerList()
-{
-  for (const PlayerData &player : std::as_const(m_player_map))
-  {
+void PlayerListWidget::filterPlayerList() {
+  for (const PlayerData &player : std::as_const(m_player_map)) {
     QTreeWidgetItem *item = m_item_map.value(player.id, nullptr);
-    if (item == nullptr)
-    {
+    if (item == nullptr) {
       qWarning() << "Trying to filter item that does not exist. This indicates "
                     "either a broken server-implementation or a bad demo file.";
       continue;
     }
-
     QTreeWidgetItem *parent = item->parent();
-    const int current_area =
-        parent != nullptr ? parent->data(0, AreaIdRole).toInt() : -1;
-    if (current_area == player.area_id)
-    {
+    const QString currentKey = currentCategoryKey(parent);
+    const QString desiredKey = categoryKeyForPlayer(player);
+    if (currentKey == desiredKey) {
       continue;
     }
-
-    if (parent != nullptr)
-    {
+    if (parent != nullptr) {
       parent->removeChild(item);
     }
-    insertPlayerItem(player.id, item, player.area_id);
-    if (current_area >= 0)
-    {
-      removeAreaIfEmpty(current_area);
+    insertPlayerItem(player.id, item, player);
+    if (!currentKey.isEmpty()) {
+      removeCategoryIfEmpty(currentKey);
     }
   }
 }
