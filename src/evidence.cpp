@@ -183,10 +183,10 @@ void Courtroom::refresh_evidence()
 
   set_size_and_pos(ui_evidence_save, "evidence_save");
   ui_evidence_save->set_image("evidence_save");
-  if (current_evidence_global)
-    ui_evidence_save->hide();
-  else
-    ui_evidence_save->show();
+  // if (current_evidence_global)
+  //   ui_evidence_save->hide();
+  // else
+  //   ui_evidence_save->show();
 
   set_size_and_pos(ui_evidence_load, "evidence_load");
   ui_evidence_load->set_image("evidence_load");
@@ -731,7 +731,7 @@ void Courtroom::evidence_switch(bool global)
   if (current_evidence_global) {
     local_evidence_list = global_evidence_list;
     ui_evidence_present->show();
-    ui_evidence_save->hide();
+    // ui_evidence_save->hide();
     ui_evidence_load->hide();
     ui_evidence_switch->set_image("evidence_global");
     ui_evidence->set_image("evidence_background");
@@ -745,7 +745,7 @@ void Courtroom::evidence_switch(bool global)
   else {
     local_evidence_list = private_evidence_list;
     ui_evidence_present->hide();
-    ui_evidence_save->show();
+    // ui_evidence_save->show();
     ui_evidence_load->show();
     ui_evidence_switch->set_image("evidence_private");
     ui_evidence->set_image("evidence_background_private");
@@ -762,10 +762,6 @@ void Courtroom::evidence_switch(bool global)
 
 void Courtroom::on_evidence_save_clicked()
 {
-  if (current_evidence_global)
-    return; // Don't allow saving/loading operations when in global inventory
-            // mode for now
-
   // "Inventories" dir keeps our private evidence data
   if (!dir_exists("inventories")) {
     // Create one if it doesn't yet exist
