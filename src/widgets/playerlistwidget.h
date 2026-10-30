@@ -41,19 +41,19 @@ public:
 private:
   enum ItemDataRole {
     PlayerIdRole = Qt::UserRole,
-    AreaIdRole,
+    CategoryKeyRole,
     ItemTypeRole,
   };
 
   enum ItemType {
     PlayerItem,
-    AreaItem,
+    CategoryItem,
   };
 
   AOApplication *ao_app;
   QMap<int, PlayerData> m_player_map;
   QMap<int, QTreeWidgetItem *> m_item_map;
-  QMap<int, QTreeWidgetItem *> m_area_item_map;
+  QMap<QString, QTreeWidgetItem *> m_category_item_map;
   QMap<int, int> m_registration_order;
   int m_next_registration_order = 0;
   QStringList m_area_names;
@@ -62,16 +62,17 @@ private:
   int m_paired_player_id = -1;
 
   QString m_format_string = "";
-
+  QString categoryKeyForPlayer(const PlayerData &player) const;
+  QString currentCategoryKey(QTreeWidgetItem *parent) const;
   void addPlayer(int playerId);
   void removePlayer(int playerId);
   void updatePlayer(int playerId, bool updateIcon);
 
-  QTreeWidgetItem *ensureAreaItem(int areaId);
-  void updateAreaLabel(int areaId);
-  void refreshAreaLabels();
-  void insertPlayerItem(int playerId, QTreeWidgetItem *item, int areaId);
-  void removeAreaIfEmpty(int areaId);
+  QTreeWidgetItem *ensureCategoryItem(const QString &categoryKey);
+  void updateCategoryLabel(const QString &categoryKey);
+  void refreshCategoryLabels();
+  void insertPlayerItem(int playerId, QTreeWidgetItem *item, const PlayerData &player);
+  void removeCategoryIfEmpty(const QString &categoryKey);
 
   QString formatLabel(const PlayerData &data);
 

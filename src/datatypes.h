@@ -90,8 +90,10 @@ struct PlayerData {
   QString character_name;
   int area_id = 0;
   QString desc;
+  // heckin KFO-Client custom fields
   QString format;
   QStringList commands;
+  QString category_name;
 };
 
 struct PlayerRegister {
@@ -113,6 +115,7 @@ struct PlayerUpdate {
     DESC,
     FORMAT,
     COMMANDS,
+    CATEGORY_NAME,
   };
 
   int id;
