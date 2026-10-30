@@ -41,7 +41,7 @@ void call_notice(QString p_message, int seconds)
     QTimer intervalTimer;
     intervalTimer.setInterval(1000);
 
-    int counter = 3;
+    int counter = seconds;
     const auto updateCounter = [msgBox, &counter] {
       if (counter <= 0)
         return;

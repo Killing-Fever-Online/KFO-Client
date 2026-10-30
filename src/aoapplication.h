@@ -409,6 +409,8 @@ private:
   QHash<uint, QString> dir_listing_cache;
   QSet<uint> dir_listing_exist_cache;
 
+  bool m_reconnecting = false;
+
 public slots:
   void server_disconnected();
   void loading_cancelled();
