@@ -515,7 +515,12 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
   }
   else if (header == "BB") {
     if (courtroom_constructed && !f_contents.isEmpty()) {
-      call_notice(f_contents.at(0));
+      int secs = 0;
+      QString msg = f_contents.at(0);
+      if (f_contents.size() >= 2) {
+        secs = f_contents.at(0).toInt();
+      }
+      call_notice(msg, secs);
     }
     log_to_demo = false;
   }

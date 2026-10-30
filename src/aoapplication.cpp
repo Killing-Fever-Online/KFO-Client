@@ -159,10 +159,10 @@ void AOApplication::server_disconnected()
               send_server_packet(new AOPacket("RM"));
               send_server_packet(new AOPacket("CC", {QString::number(client_id),
                             QString::number(w_courtroom->get_cid()), hdid}));
-              call_notice(tr("Success reconnecting to server."));
+              call_notice(tr("Success reconnecting to server."), 0);
               // send_server_packet(new AOPacket("MC", w_courtroom->last_area_entered));
           } else {
-              call_notice(tr("Failed to reconnect to server."));
+              call_notice(tr("Failed to reconnect to server."), 0);
               construct_lobby();
               destruct_courtroom();
           }
