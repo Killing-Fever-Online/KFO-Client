@@ -205,19 +205,33 @@ void Lobby::loadUI()
   FROM_UI(QLabel, server_player_count_lbl)
   FROM_UI(QTextBrowser, server_description_text)
   FROM_UI(QPushButton, connect_button);
-  connect(ui_connect_button, &QPushButton::released, net_manager,
-          &NetworkManager::join_to_server);
-  connect(ui_connect_button, &QPushButton::released, this, [=] {
-    ui_server_player_count_lbl->setText(tr("Joining Server..."));
-  });
+  connect(ui_connect_button, &QPushButton::released, this,
+          &Lobby::on_connect_released);
   connect(net_manager, &NetworkManager::server_connected, this, [&](bool state) {
     if (state) {
-      ui_server_player_count_lbl->setText(tr("Connected!"));
+      if (join_after_connect) {
+        ui_server_player_count_lbl->setText(tr("Connecting..."));
+        ui_connect_button->setEnabled(false);
+      }
+      else {
+        ui_server_player_count_lbl->setText(tr("Connected!"));
+        ui_connect_button->setEnabled(true);
+      }
     }
     else {
+      join_after_connect = false;
       ui_server_player_count_lbl->setText(tr("Couldn't connect."));
+      ui_connect_button->setEnabled(true);
     }
-    ui_connect_button->setEnabled(state);
+  });
+  connect(net_manager, &NetworkManager::server_ready, this, [&] {
+    if (!join_after_connect)
+      return;
+
+    join_after_connect = false;
+    ui_server_player_count_lbl->setText(tr("Joining Server..."));
+    ui_connect_button->setEnabled(false);
+    net_manager->join_to_server();
   });
 
   FROM_UI(QTextBrowser, motd_text);
@@ -383,20 +397,64 @@ void Lobby::on_server_list_clicked(QTreeWidgetItem *p_item, int column)
 
   ui_server_description_text->moveCursor(QTextCursor::Start);
   ui_server_description_text->ensureCursorVisible();
-  ui_server_player_count_lbl->setText(tr("Connecting..."));
+  set_player_count(f_server.players, -1);
 
-  ui_connect_button->setEnabled(false);
-
-  net_manager->connect_to_server(f_server);
+  ui_connect_button->setEnabled(true);
 }
 
-// doubleclicked on an item in the serverlist so we'll connect right away
+bool Lobby::connect_to_selected_server()
+{
+  int selection = get_selected_server();
+  if (selection < 0)
+    return false;
+
+  server_type f_server;
+  if (current_page == SERVER) {
+    QVector<server_type> f_server_list = ao_app->get_server_list();
+    if (selection >= f_server_list.size())
+      return false;
+    f_server = f_server_list.at(selection);
+  }
+  else if (current_page == FAVORITES) {
+    QVector<server_type> f_server_list = Options::getInstance().favorites();
+    if (selection >= f_server_list.size())
+      return false;
+    f_server = f_server_list.at(selection);
+  }
+  else {
+    return false;
+  }
+
+  join_after_connect = true;
+  ui_server_player_count_lbl->setText(tr("Connecting..."));
+  ui_connect_button->setEnabled(false);
+  net_manager->connect_to_server(f_server);
+  return true;
+}
+
+void Lobby::on_connect_released()
+{
+  if (current_page == DEMOS) {
+    ui_server_player_count_lbl->setText(tr("Joining Server..."));
+    net_manager->join_to_server();
+    return;
+  }
+
+  connect_to_selected_server();
+}
+
 void Lobby::on_list_doubleclicked(QTreeWidgetItem *p_item, int column)
 {
   Q_UNUSED(p_item)
   Q_UNUSED(column)
-  ui_server_player_count_lbl->setText(tr("Joining Server..."));
-  net_manager->join_to_server();
+
+  if (current_page == DEMOS) {
+    ui_server_player_count_lbl->setText(tr("Joining Server..."));
+    net_manager->join_to_server();
+    return;
+  }
+
+  connect_to_selected_server();
 }
 
 void Lobby::on_favorite_tree_clicked(QTreeWidgetItem *p_item, int column)
@@ -425,11 +483,9 @@ void Lobby::on_favorite_tree_clicked(QTreeWidgetItem *p_item, int column)
   set_server_description(f_server.desc);
   ui_server_description_text->moveCursor(QTextCursor::Start);
   ui_server_description_text->ensureCursorVisible();
-  ui_server_player_count_lbl->setText(tr("Connecting..."));
+  set_player_count(f_server.players, -1);
 
-  ui_connect_button->setEnabled(false);
-
-  net_manager->connect_to_server(f_server);
+  ui_connect_button->setEnabled(true);
 }
 
 void Lobby::on_server_search_edited(QString p_text)
@@ -652,6 +708,17 @@ void Lobby::check_for_updates()
 
 void Lobby::set_player_count(int players_online, int max_players)
 {
+  if (max_players < 0) {
+    if (players_online < 0) {
+      ui_server_player_count_lbl->setText(tr("Server"));
+    }
+    else {
+      ui_server_player_count_lbl->setText(
+          tr("Online: %1").arg(QString::number(players_online)));
+    }
+    return;
+  }
+
   QString f_string =
       tr("Online: %1/%2")
           .arg(QString::number(players_online), QString::number(max_players));

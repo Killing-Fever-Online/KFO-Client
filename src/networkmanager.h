@@ -68,6 +68,7 @@ public:
 
 signals:
   void server_connected(bool state);
+  void server_ready();
   void imageLoaded(const QImage& image);
 
 public slots:

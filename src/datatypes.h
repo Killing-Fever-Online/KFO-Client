@@ -19,6 +19,7 @@ struct server_type {
   QString desc;
   QString ip;
   int port;
+  int players = -1;
   connection_type socket_type;
 };
 

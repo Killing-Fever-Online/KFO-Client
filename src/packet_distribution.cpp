@@ -148,7 +148,8 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
       typing_timer_supported = true;
     if (f_packet.contains("video_support", Qt::CaseInsensitive))
       video_supported = true;
-  log_to_demo = false;
+    log_to_demo = false;
+    Q_EMIT net_manager->server_ready();
   }
   else if (header == "PN") {
     if (!lobby_constructed || f_contents.size() < 2)
