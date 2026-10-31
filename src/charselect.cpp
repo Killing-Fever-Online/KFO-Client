@@ -5,6 +5,7 @@
 #include "file_functions.h"
 #include "hardware_functions.h"
 
+#include <QHash>
 #include <QMessageBox>
 
 void Courtroom::construct_char_select()
@@ -123,33 +124,6 @@ void Courtroom::set_char_select_page()
 
   ui_char_select_left->hide();
   ui_char_select_right->hide();
-
-  for (AOCharButton *i_button : std::as_const(ui_char_button_list)) {
-    i_button->reset();
-    i_button->hide();
-    i_button->move(0, 0);
-  }
-
-  int total_pages = ui_char_button_list_filtered.size() / max_chars_on_page;
-  int chars_on_page = 0;
-
-  if (ui_char_button_list_filtered.size() % max_chars_on_page != 0) {
-    ++total_pages;
-    // i. e. not on the last page
-    if (total_pages > current_char_page + 1)
-      chars_on_page = max_chars_on_page;
-    else
-      chars_on_page = ui_char_button_list_filtered.size() % max_chars_on_page;
-  }
-  else
-    chars_on_page = max_chars_on_page;
-
-  if (total_pages > current_char_page + 1)
-    ui_char_select_right->show();
-
-  if (current_char_page > 0)
-    ui_char_select_left->show();
-
   QPoint f_spacing =
       ao_app->get_button_spacing("char_button_spacing", "courtroom_design.ini");
 
@@ -161,10 +135,33 @@ void Courtroom::set_char_select_page()
   char_rows = ((ui_char_buttons->height() - s_button_size) /
                (f_spacing.y() + s_button_size)) +
               1;
+  max_chars_on_page = qMax(1, char_columns * char_rows);
 
-  max_chars_on_page = char_columns * char_rows;
+  for (AOCharButton *i_button : std::as_const(ui_char_button_list)) {
+    i_button->reset();
+    i_button->hide();
+    i_button->move(0, 0);
+  }
 
-  put_button_in_place(current_char_page * max_chars_on_page, chars_on_page);
+  const int filtered_size = ui_char_button_list_filtered.size();
+  if (filtered_size == 0)
+    return;
+
+  const int total_pages = (filtered_size + max_chars_on_page - 1) / max_chars_on_page;
+  current_char_page = qBound(0, current_char_page, total_pages - 1);
+
+  if (total_pages > current_char_page + 1)
+    ui_char_select_right->show();
+
+  if (current_char_page > 0)
+    ui_char_select_left->show();
+
+  ensure_char_button_pool(max_chars_on_page);
+
+  const int starting = current_char_page * max_chars_on_page;
+  const int chars_on_page = qMin(max_chars_on_page, filtered_size - starting);
+
+  put_button_in_place(starting, chars_on_page);
 }
 
 void Courtroom::on_char_list_double_clicked(QTreeWidgetItem *p_item, int column)
@@ -247,8 +244,12 @@ void Courtroom::char_clicked(int n_char)
 void Courtroom::on_char_button_context_menu_requested(const QPoint &pos)
 {
   AOCharButton* button = qobject_cast<AOCharButton*>(sender());
-  int n_char = ui_char_button_list.indexOf(button);
-  if (n_char == -1)
+  if (button == nullptr)
+  {
+    return;
+  }
+  int n_char = button->char_id;
+  if (n_char < 0 || n_char >= char_list.size())
   {
     return;
   }
@@ -279,6 +280,25 @@ void Courtroom::on_char_button_context_menu_requested(const QPoint &pos)
   menu->popup(button->mapToGlobal(pos));
 }
 
+void Courtroom::ensure_char_button_pool(int count)
+{
+  while (ui_char_button_list.size() < count) {
+    AOCharButton *char_button =
+        new AOCharButton(ui_char_buttons, ao_app, 0, 0, false);
+    char_button->setContextMenuPolicy(Qt::CustomContextMenu);
+    char_button->reset();
+    char_button->hide();
+    ui_char_button_list.append(char_button);
+
+    connect(char_button, &AOCharButton::clicked, this, [this, char_button]() {
+      if (char_button->char_id >= 0)
+        this->char_clicked(char_button->char_id);
+    });
+    connect(char_button, &AOCharButton::customContextMenuRequested, this,
+            &Courtroom::on_char_button_context_menu_requested);
+  }
+}
+
 void Courtroom::put_button_in_place(int starting, int chars_on_this_page)
 {
   if (ui_char_button_list_filtered.size() == 0)
@@ -290,15 +310,24 @@ void Courtroom::put_button_in_place(int starting, int chars_on_this_page)
   int x_mod_count = 0;
   int y_mod_count = 0;
 
-  int startout = starting;
   int size = static_cast<int>(button_width * Options::getInstance().themeScalingFactor());
-  for (int n = starting; n < startout + chars_on_this_page; ++n) {
+  for (int i = 0; i < chars_on_this_page; ++i) {
+    const int char_id = ui_char_button_list_filtered.at(starting + i);
+    AOCharButton *char_button = ui_char_button_list.at(i);
+
     int x_pos = (size + f_spacing.x()) * x_mod_count;
     int y_pos = (size + f_spacing.y()) * y_mod_count;
 
-    ui_char_button_list_filtered.at(n)->move(x_pos, y_pos);
-    ui_char_button_list_filtered.at(n)->show();
-    ui_char_button_list_filtered.at(n)->apply_taken_image();
+    if (char_button->char_id != char_id) {
+      char_button->char_id = char_id;
+      char_button->set_image(char_list.at(char_id).name);
+      char_button->setToolTip(char_list.at(char_id).name);
+    }
+    char_button->reset();
+    char_button->set_taken(char_list.at(char_id).taken);
+    char_button->move(x_pos, y_pos);
+    char_button->show();
+    char_button->apply_taken_image();
 
     ++x_mod_count;
 
@@ -313,104 +342,83 @@ void Courtroom::character_loading_finished()
 {
   m_cid = -1;
 
-  // Zeroeth, we'll clear any leftover characters from previous server visits.
-  // ao_app->generated_chars = 0;
-  if (ui_char_button_list.size() > 0) {
-    foreach (AOCharButton *item, ui_char_button_list) {
-      delete item;
-    }
-    ui_char_button_list.clear();
-    ui_char_list->clear();
-  }
+  const QObjectList char_button_children = ui_char_buttons->children();
+  for (QObject *child : char_button_children)
+    delete child;
+  ui_char_button_list.clear();
+  ui_char_button_list_filtered.clear();
 
-  // First, we'll make all the character buttons in the very beginning.
-  // We also hide them all, so they can't be accidentally clicked.
-  // Later on, we'll be revealing buttons as we need them.
+  ui_char_list->clear();
+  ui_char_list_items.clear();
+  ui_char_list_items.reserve(char_list.size());
+
+  QHash<QString, QTreeWidgetItem *> categories;
+
   for (int n = 0; n < char_list.size(); n++) {
-    AOCharButton *char_button =
-        new AOCharButton(ui_char_buttons, ao_app, 0, 0, char_list.at(n).taken);
-    char_button->setContextMenuPolicy(Qt::CustomContextMenu);
-    char_button->reset();
-    char_button->hide();
-    char_button->set_image(char_list.at(n).name);
-    char_button->setToolTip(char_list.at(n).name);
-    ui_char_button_list.append(char_button);
-    QString char_category = char_list.at(n).category;
-    QList<QTreeWidgetItem*> matching_list = ui_char_list->findItems(char_category, Qt::MatchFixedString, 0);
+    const char_type &f_char = char_list.at(n);
+    const QString char_category = f_char.category;
+
     // create the character tree item
     QTreeWidgetItem *treeItem = new QTreeWidgetItem();
-    treeItem->setText(0, char_list.at(n).name);
-   // treeItem->setIcon(0, QIcon(ao_app->get_image_suffix(
-      // ao_app->get_character_path(char_list.at(n).name, "char_icon"))));
+    treeItem->setText(0, f_char.name);
     treeItem->setText(1, QString::number(n));
-    // category logic
-    QTreeWidgetItem *category;
-    if (char_category == "") // no category
-      ui_char_list->addTopLevelItem(treeItem);
-    else if (!matching_list.isEmpty()) { // our category already exists
-      category = matching_list[0];
-      category->addChild(treeItem);
-    }
-    else { // we need to make a new category
-      category = new QTreeWidgetItem();
-      category->setText(0, char_category);
-      category->setText(1, "-1");
-      category->setChildIndicatorPolicy(QTreeWidgetItem::DontShowIndicatorWhenChildless);
-      ui_char_list->insertTopLevelItem(0, category);
-      category->addChild(treeItem);
-    }
-      
-    
-    connect(char_button, &AOCharButton::clicked,
-            [this, n]() { this->char_clicked(n); });
-    connect(char_button, &AOCharButton::customContextMenuRequested, this, &Courtroom::on_char_button_context_menu_requested);
+    ui_char_list_items.append(treeItem);
 
-    // This part here serves as a way of showing to the player that the game is
-    // still running, it is just loading the pictures of the characters.
-    // if (ao_app->lobby_constructed) {
-    //   ao_app->generated_chars++;
-    // }
+    // category logic
+    if (char_category == "") { // no category
+      ui_char_list->addTopLevelItem(treeItem);
+    }
+    else {
+      const QString category_key = char_category.toLower();
+      QTreeWidgetItem *category = categories.value(category_key, nullptr);
+      if (category == nullptr) { // we need to make a new category
+        category = new QTreeWidgetItem();
+        category->setText(0, char_category);
+        category->setText(1, "-1");
+        category->setChildIndicatorPolicy(QTreeWidgetItem::DontShowIndicatorWhenChildless);
+        ui_char_list->insertTopLevelItem(0, category);
+        categories.insert(category_key, category);
+      }
+      category->addChild(treeItem);
+    }
   }
   ui_char_list->expandAll();
+
+  if (ui_char_select_background->isVisible())
+    filter_character_list();
 }
 
 void Courtroom::filter_character_list()
 {
   ui_char_button_list_filtered.clear();
+
+  const QString search_text = ui_char_search->text();
+  const bool show_taken = ui_char_taken->isChecked();
+
   for (int i = 0; i < char_list.size(); i++) {
-    AOCharButton *current_char = ui_char_button_list.at(i);
-    QTreeWidgetItem* current_char_list_item = ui_char_list->findItems(QString::number(i), Qt::MatchExactly | Qt::MatchRecursive, 1)[0];
+    if (i >= ui_char_list_items.size())
+      break;
 
-
+    QTreeWidgetItem *current_char_list_item = ui_char_list_items.at(i);
+    const char_type &f_char = char_list.at(i);
 
     // It seems passwording characters is unimplemented yet?
     // Until then, this will stay here, I suppose.
     // if (ui_char_passworded->isChecked() && character_is_passworded??)
     //    continue;
 
-    if (!ui_char_taken->isChecked() && char_list.at(i).taken) {
+    const bool matches_search =
+        f_char.name.contains(search_text, Qt::CaseInsensitive) ||
+        f_char.category.contains(search_text, Qt::CaseInsensitive);
+
+    if ((!show_taken && f_char.taken) || !matches_search) {
       current_char_list_item->setHidden(true);
       continue;
     }
 
-    if (!char_list.at(i).name.contains(ui_char_search->text(), Qt::CaseInsensitive) && !char_list.at(i).category.contains(ui_char_search->text(), Qt::CaseInsensitive)) {
-      current_char_list_item->setHidden(true);
-      continue;
-  }
-
-    // We only really need to update the fact that a character is taken
-    // for the buttons that actually appear.
-    // You'd also update the passwordedness and etc. here later.
-    current_char->reset();
     current_char_list_item->setHidden(false);
-    current_char->set_taken(char_list.at(i).taken);
-    current_char_list_item->setText(0, char_list.at(i).name);
-    // reset disabled
-    current_char_list_item->setDisabled(false);
-    if (char_list.at(i).taken) // woops, we are taken
-      current_char_list_item->setDisabled(true);
-
-    ui_char_button_list_filtered.append(current_char);
+    current_char_list_item->setDisabled(f_char.taken);
+    ui_char_button_list_filtered.append(i);
   }
 
   current_char_page = 0;

@@ -444,4 +444,5 @@ void AOApplication::invalidate_lookup_cache() {
   asset_lookup_cache.clear();
   dir_listing_cache.clear();
   dir_listing_exist_cache.clear();
+  ini_cache.clear();
 }
