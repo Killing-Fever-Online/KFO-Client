@@ -300,6 +300,10 @@ void AOOptionsDialog::savePressed()
     entry.save();
   }
 
+  if (asset_cache_dirty && ao_app != nullptr)
+    ao_app->invalidate_lookup_cache();
+  asset_cache_dirty = false;
+
   if (l_reload_theme_required) {
     emit reloadThemeRequest();
   }

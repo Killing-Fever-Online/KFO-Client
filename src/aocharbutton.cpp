@@ -63,8 +63,9 @@ void AOCharButton::set_passworded() { ui_passworded->show(); }
 
 void AOCharButton::set_image(QString p_character)
 {
-  QString image_path = ao_app->get_image_suffix(
-      ao_app->get_character_path(p_character, "char_icon"));
+  QString image_path = ao_app->get_real_path(
+      ao_app->get_character_path(p_character, "char_icon"),
+      {".png"});
 
   if (file_exists(image_path)) {
     this->setStyleSheet("QPushButton { border-image: url(\"" + image_path +
