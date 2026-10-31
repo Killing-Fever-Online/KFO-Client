@@ -593,6 +593,9 @@ int AOApplication::get_emote_number(QString p_char)
 
 QString AOApplication::get_emote_comment(QString p_char, int p_emote)
 {
+  // spectator character?
+  if (p_char.isEmpty())
+    return "";
   QString f_result =
       read_char_ini(p_char, QString::number(p_emote + 1), "Emotions");
 
@@ -600,13 +603,16 @@ QString AOApplication::get_emote_comment(QString p_char, int p_emote)
 
   if (result_contents.size() < 4) {
     qWarning() << "misformatted char.ini: " << p_char << ", " << p_emote;
-    return "normal";
+    return "";
   }
   return result_contents.at(0);
 }
 
 QString AOApplication::get_pre_emote(QString p_char, int p_emote)
 {
+  // spectator character?
+  if (p_char.isEmpty())
+    return "";
   QString f_result =
       read_char_ini(p_char, QString::number(p_emote + 1), "Emotions");
 
@@ -621,6 +627,9 @@ QString AOApplication::get_pre_emote(QString p_char, int p_emote)
 
 QString AOApplication::get_emote(QString p_char, int p_emote)
 {
+  // spectator character?
+  if (p_char.isEmpty())
+    return "";
   QString f_result =
       read_char_ini(p_char, QString::number(p_emote + 1), "Emotions");
 
@@ -628,13 +637,16 @@ QString AOApplication::get_emote(QString p_char, int p_emote)
 
   if (result_contents.size() < 4) {
     qWarning() << "misformatted char.ini: " << p_char << ", " << p_emote;
-    return "normal";
+    return "";
   }
   return result_contents.at(2);
 }
 
 int AOApplication::get_emote_mod(QString p_char, int p_emote)
 {
+  // spectator character?
+  if (p_char.isEmpty())
+    return 0;
   QString f_result =
       read_char_ini(p_char, QString::number(p_emote + 1), "Emotions");
 
