@@ -64,6 +64,7 @@ void NetworkManager::ms_request_finished(QNetworkReply *reply,
     server.ip = entry["ip"].toString();
     server.name = entry["name"].toString();
     server.desc = entry["description"].toString(tr("No description provided."));
+    server.players = entry["players"].toInt(-1);
     if (entry["ws_port"].isDouble()) {
       server.socket_type = WEBSOCKETS;
       server.port = entry["ws_port"].toInt();
