@@ -32,7 +32,7 @@ jobs:
             modules: 'qtimageformats qtwebsockets qtmultimedia'
 
           - platform: macos
-            os: macos-14
+            os: macos-15
             target: desktop
             arch: clang_64
             modules: 'qtimageformats qtwebsockets qtmultimedia'
