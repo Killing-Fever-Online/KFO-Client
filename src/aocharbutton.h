@@ -19,6 +19,8 @@ public:
 
   AOApplication *ao_app;
 
+  int char_id = -1;
+
   void refresh();
   void reset();
   void set_taken(bool is_taken);

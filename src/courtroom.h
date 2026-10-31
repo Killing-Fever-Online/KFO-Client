@@ -923,7 +923,8 @@ private:
   QWidget *ui_char_buttons;
 
   QVector<AOCharButton *> ui_char_button_list;
-  QVector<AOCharButton *> ui_char_button_list_filtered;
+  QVector<int> ui_char_button_list_filtered;
+  QVector<QTreeWidgetItem *> ui_char_list_items;
 
   AOButton *ui_back_to_lobby;
 
@@ -943,6 +944,7 @@ private:
   void set_char_select_page();
   void char_clicked(int n_char);
   void on_char_button_context_menu_requested(const QPoint &pos);
+  void ensure_char_button_pool(int count);
   void put_button_in_place(int starting, int chars_on_this_page);
   void filter_character_list();
 
