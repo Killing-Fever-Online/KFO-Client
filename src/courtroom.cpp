@@ -1500,6 +1500,7 @@ void Courtroom::set_widgets()
       QBrush(ao_app->get_color("area_hub_color", "courtroom_design.ini"));
 
   refresh_evidence();
+  refresh_emotes();
 }
 
 void Courtroom::set_fonts(QString p_char)
@@ -1653,6 +1654,11 @@ void Courtroom::set_taken(int n_char, bool p_taken)
 {
   if (n_char >= char_list.size()) {
     qWarning() << "set_taken attempted to set an index bigger than char_list size";
+    return;
+  }
+  if (n_char < 0)
+  {
+    qWarning() << "set_taken attempted to set an index smaller than 0";
     return;
   }
 
@@ -1842,7 +1848,7 @@ void Courtroom::update_character(int p_cid, QString char_name, bool reset_emote)
 
   QString f_char;
 
-  if (m_cid == -1) {
+  if (m_cid == -1 && char_name.isEmpty()) {
     if (Options::getInstance().discordEnabled())
       ao_app->discord->state_spectate();
     f_char = "";
@@ -1868,12 +1874,6 @@ void Courtroom::update_character(int p_cid, QString char_name, bool reset_emote)
     current_emote = 0;
   }
 
-  if (m_cid == -1)
-    ui_emotes->hide();
-  else
-    ui_emotes->show();
-
-  refresh_emotes();
   set_emote_page();
   set_emote_dropdown();
 
@@ -1941,7 +1941,9 @@ void Courtroom::update_character(int p_cid, QString char_name, bool reset_emote)
     ui_ic_chat_name->setPlaceholderText("Spectator");
   }
   ui_char_select_background->hide();
-  ui_ic_chat_message->setEnabled(m_cid != -1);
+  // some servers may want spectators to still be able to chat (e.g. GM clients)
+  // (if the server codebase doesn't filter spectator output that's just wack)
+  // ui_ic_chat_message->setEnabled(m_cid != -1);
   ui_ic_chat_message->setFocus();
   update_audio_volume();
 }
@@ -5458,19 +5460,21 @@ void Courtroom::set_iniswap_dropdown()
 {
   ui_iniswap_dropdown->blockSignals(true);
   ui_iniswap_dropdown->clear();
-  if (m_cid == -1) {
-    ui_iniswap_dropdown->hide();
-    ui_iniswap_remove->hide();
-    return;
+
+  QString char_name;
+  if (m_cid >= 0) {
+      char_name = char_list.at(m_cid).name;
+  }
+  else {
+      char_name = "";
   }
 
-  QString char_name = char_list.at(m_cid).name;
   VPath char_path = ao_app->get_character_path(char_name, "iniswaps.ini");
   QStringList iniswaps =
       ao_app->get_list_file(char_path) +
       ao_app->get_list_file(VPath("iniswaps.ini"));
 
-  iniswaps.prepend(char_list.at(m_cid).name);
+  iniswaps.prepend(char_name);
   iniswaps.removeDuplicates();
   if (iniswaps.size() <= 0) {
     ui_iniswap_dropdown->hide();
@@ -5501,11 +5505,15 @@ void Courtroom::on_iniswap_dropdown_changed(int p_index)
   ui_ic_chat_message->setFocus();
   QString iniswap = ui_iniswap_dropdown->itemText(p_index);
 
+  QString char_name;
+  if (m_cid >= 0)
+      char_name = char_list.at(m_cid).name;
+
   QStringList swaplist;
-  QStringList defswaplist = ao_app->get_list_file(ao_app->get_character_path(char_list.at(m_cid).name, "iniswaps.ini"));
+  QStringList defswaplist = ao_app->get_list_file(ao_app->get_character_path(char_name, "iniswaps.ini"));
   for (int i = 0; i < ui_iniswap_dropdown->count(); ++i) {
     QString entry = ui_iniswap_dropdown->itemText(i);
-    if (!swaplist.contains(entry) && entry != char_list.at(m_cid).name && !defswaplist.contains(entry))
+    if (!swaplist.contains(entry) && entry != char_name && !defswaplist.contains(entry))
       swaplist.append(entry);
   }
   QString p_path = ao_app->get_real_path(VPath("iniswaps.ini"));
@@ -5539,8 +5547,11 @@ void Courtroom::on_iniswap_context_menu_requested(const QPoint &pos)
                     ao_app->get_character_path(current_char, "char.ini"))))
     menu->addAction(QString("Edit " + current_char + "/char.ini"), this,
                     &Courtroom::on_iniswap_edit_requested);
+  QString char_name;
+  if (m_cid >= 0)
+      char_name = char_list.at(m_cid).name;
   if (ui_iniswap_dropdown->itemText(ui_iniswap_dropdown->currentIndex()) !=
-      char_list.at(m_cid).name)
+      char_name)
     menu->addAction(QString("Remove " + current_char), this,
                     &Courtroom::on_iniswap_remove_clicked);
 
@@ -5574,9 +5585,13 @@ void Courtroom::on_iniswap_remove_clicked()
                                // client will crash
     return;
   }
-  QStringList defswaplist = ao_app->get_list_file(ao_app->get_character_path(char_list.at(m_cid).name, "iniswaps.ini"));
+
+  QString char_name;
+  if (m_cid >= 0)
+      char_name = char_list.at(m_cid).name;
+  QStringList defswaplist = ao_app->get_list_file(ao_app->get_character_path(char_name, "iniswaps.ini"));
   QString iniswap = ui_iniswap_dropdown->itemText(ui_iniswap_dropdown->currentIndex());
-  if (iniswap != char_list.at(m_cid).name && !defswaplist.contains(iniswap)) {
+  if (iniswap != char_name && !defswaplist.contains(iniswap)) {
     ui_iniswap_dropdown->removeItem(ui_iniswap_dropdown->currentIndex());
   }
   on_iniswap_dropdown_changed(0); // Reset back to original
@@ -5587,11 +5602,6 @@ void Courtroom::set_sfx_dropdown()
 {
   ui_sfx_dropdown->blockSignals(true);
   ui_sfx_dropdown->clear();
-  if (m_cid == -1) {
-    ui_sfx_dropdown->hide();
-    ui_sfx_remove->hide();
-    return;
-  }
   // Initialzie character sound list first. Will be empty if not found.
   sound_list = ao_app->get_list_file(
       ao_app->get_character_path(current_char, "soundlist.ini"));
@@ -5706,10 +5716,6 @@ void Courtroom::set_effects_dropdown()
 {
   ui_effects_dropdown->blockSignals(true);
   ui_effects_dropdown->clear();
-  if (m_cid == -1) {
-    ui_effects_dropdown->hide();
-    return;
-  }
   QStringList effectslist;
   effectslist.append(ao_app->get_effects(current_char));
 
@@ -5826,6 +5832,9 @@ QString Courtroom::get_char_sfx()
     return ao_app->get_sfx_name(current_char, current_emote);
   }
   if (index == 1) { // Nothing
+    return "1";
+  }
+  if (sound_list.isEmpty()) {
     return "1";
   }
   QString sfx = sound_list[index-2].split("=")[0].trimmed();
