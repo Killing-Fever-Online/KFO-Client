@@ -529,14 +529,9 @@ void Options::setDefaultScalingMode(QString value)
   config.setValue("default_scaling", value);
 }
 
-QStringList Options::mountPaths() const
+QStringList Options::legacyMountPaths() const
 {
   return config.value("mount_paths").value<QStringList>();
-}
-
-void Options::setMountPaths(QStringList value)
-{
-  config.setValue("mount_paths", value);
 }
 
 bool Options::playerCountOptout() const

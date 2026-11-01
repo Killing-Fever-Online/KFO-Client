@@ -64,6 +64,15 @@ QString get_base_path()
   return base_path;
 }
 
+QString get_packages_path()
+{
+  QDir base_dir(get_base_path());
+  if (base_dir.cdUp()) {
+    return base_dir.absolutePath() + "/packages/";
+  }
+  return get_app_dir_path() + "/packages/";
+}
+
 void seed_base_if_missing()
 {
 #ifdef Q_OS_MACOS
@@ -81,4 +90,80 @@ void seed_base_if_missing()
   QDir().mkpath(QFileInfo(user_base).absolutePath());
   QProcess::execute("ditto", {bundled_base, user_base});
 #endif
+}
+
+bool copyDirectoryRecursive(const QString &sourcePath, const QString &destPath)
+{
+  if (!QDir().mkpath(destPath)) {
+    return false;
+  }
+
+  const QFileInfoList entries = QDir(sourcePath).entryInfoList(
+      QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+
+  for (const QFileInfo &info : entries) {
+    const QString target = QDir(destPath).filePath(info.fileName());
+    if (info.isSymLink()) {
+      if (!QFile::link(info.symLinkTarget(), target)) {
+        return false;
+      }
+    }
+    else if (info.isDir()) {
+      if (!copyDirectoryRecursive(info.absoluteFilePath(), target)) {
+        return false;
+      }
+    }
+    else if (!QFile::copy(info.absoluteFilePath(), target)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool moveDirectoryInto(const QString &sourcePath, const QString &destPath,
+                       QString *error)
+{
+  if (QFileInfo::exists(destPath)) {
+    if (error != nullptr) {
+      *error = QObject::tr(
+          "A folder with that name already exists in the packages folder.");
+    }
+    return false;
+  }
+
+  // Refuse to move a folder into itself (for example, selecting the app
+  // folder when packages/ lives inside it).
+  const QString sourceCanonical = QDir(sourcePath).canonicalPath();
+  const QString destParentCanonical =
+      QDir(QFileInfo(destPath).absolutePath()).canonicalPath();
+  if (!sourceCanonical.isEmpty() && !destParentCanonical.isEmpty() &&
+      (destParentCanonical == sourceCanonical ||
+       destParentCanonical.startsWith(sourceCanonical + QLatin1Char('/')))) {
+    if (error != nullptr) {
+      *error = QObject::tr("A folder can't be moved into itself.");
+    }
+    return false;
+  }
+
+  if (QDir().rename(sourcePath, destPath)) {
+    return true;
+  }
+
+  // rename() cannot move between different drives/filesystems. Falling back
+  // to copy-then-delete keeps the Move option useful for those folders.
+  if (!copyDirectoryRecursive(sourcePath, destPath)) {
+    QDir(destPath).removeRecursively();
+    if (error != nullptr) {
+      *error = QObject::tr("Couldn't copy the folder into packages.");
+    }
+    return false;
+  }
+
+  if (!QDir(sourcePath).removeRecursively()) {
+    // The copy is complete and usable. Leave the original in place rather
+    // than deleting anything else, but let the user know.
+    qWarning() << "Copied" << sourcePath << "to" << destPath
+               << "but could not remove the original folder";
+  }
+  return true;
 }

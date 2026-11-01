@@ -5,6 +5,7 @@
 #include "debug_functions.h"
 #include "file_functions.h"
 #include "lobby.h"
+#include "mount_manager.h"
 #include "networkmanager.h"
 #include "options.h"
 
@@ -30,6 +31,11 @@ AOApplication::AOApplication(int &argc, char **argv) : QApplication(argc, argv)
 
   net_manager = new NetworkManager(this);
   discord = new AttorneyOnline::Discord();
+
+  m_mounts = new MountManager(this);
+  m_mounts->initialize();
+  connect(m_mounts, &MountManager::changed, this,
+          [this] { invalidate_lookup_cache(); });
 
   asset_lookup_cache.reserve(2048);
 

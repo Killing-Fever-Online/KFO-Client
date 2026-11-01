@@ -261,9 +261,9 @@ public:
   QString defaultScalingMode() const;
   void setDefaultScalingMode(QString value);
 
-  // Get a list of custom mount paths
-  QStringList mountPaths() const;
-  void setMountPaths(QStringList value);
+  // Legacy mount_paths value from config.ini, used only to seed
+  // packages/mounts.txt when that file does not exist yet.
+  QStringList legacyMountPaths() const;
 
   // Get whether to opt out of player count metrics sent to the master server
   bool playerCountOptout() const;

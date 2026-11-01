@@ -34,6 +34,7 @@ class NetworkManager;
 class Lobby;
 class Courtroom;
 class Options;
+class MountManager;
 
 class VPath : QString {
   using QString::QString;
@@ -65,6 +66,8 @@ public:
   Lobby *w_lobby;
   Courtroom *w_courtroom;
   AttorneyOnline::Discord *discord;
+
+  MountManager *mounts() const { return m_mounts; }
 
   QFont default_font;
 
@@ -403,6 +406,8 @@ private:
   const int MAJOR_VERSION = 10;
   const int MINOR_VERSION = 1;
   const int HOTFIX = 0;
+
+  MountManager *m_mounts = nullptr;
 
   QVector<server_type> server_list;
   QHash<uint, QString> asset_lookup_cache;
