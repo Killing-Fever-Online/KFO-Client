@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(Attorney_Online VERSION 2.11.0.0 LANGUAGES CXX C)
+project(Attorney_Online VERSION 2.10.1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -37,7 +37,7 @@ AOApplication::AOApplication(int &argc, char **argv) : QApplication(argc, argv)
   original_message_handler = qInstallMessageHandler(message_handler);
 
   setApplicationVersion(get_version_string());
-  setApplicationDisplayName(tr("Attorney Online Golden: %1").arg(applicationVersion()));
+  setApplicationDisplayName(tr("Attorney Online KFO: %1").arg(applicationVersion()));
 
   // Qt5 had hard-coded colors. Qt6 uses Windows accent color for several palette roles,
   // which breaks AO's UI since it wasn't designed with that in mind. Hard-code the colors.
