@@ -398,7 +398,7 @@ public:
 
 private:
   const QString GENERATION = "KFO";
-  const QString VERSION_STATUS = "Beta"; // Release, RC, Beta
+  const QString VERSION_STATUS = "Beta 6"; // Release, RC, Beta
   const int RELEASE = 2;
   const int MAJOR_VERSION = 10;
   const int MINOR_VERSION = 1;
