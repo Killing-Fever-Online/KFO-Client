@@ -129,6 +129,7 @@ private:
   QPushButton *ui_mount_up;
   QPushButton *ui_mount_down;
   QPushButton *ui_mount_clear_cache;
+  QPushButton *ui_mount_open_folder;
 
   // The logging tab
   QCheckBox *ui_downwards_cb;

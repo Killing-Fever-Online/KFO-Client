@@ -796,6 +796,27 @@ void AOOptionsDialog::setupUI()
     ui_mount_clear_cache->setEnabled(false);
   });
 
+  FROM_UI(QPushButton, mount_open_folder)
+  connect(ui_mount_open_folder, &QPushButton::clicked, this, [this] {
+    QString path;
+    auto selected = ui_mount_list->selectedItems();
+    if (!selected.isEmpty() && ui_mount_list->row(selected[0]) > 0) {
+      const QString entry = selected[0]->data(Qt::UserRole).toString();
+      if (!entry.isEmpty()) {
+        path = QFileInfo(entry).isAbsolute()
+                   ? entry
+                   : QDir(get_app_dir_path()).filePath(entry);
+      }
+    }
+    if (path.isEmpty()) {
+      path = get_base_path();
+    }
+    if (!dir_exists(path)) {
+      return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+  });
+
   connect(ui_mount_list, &QListWidget::itemSelectionChanged, this, [this] {
     auto selected_items = ui_mount_list->selectedItems();
     bool row_selected = !selected_items.isEmpty() &&
@@ -964,8 +985,8 @@ void AOOptionsDialog::populateMountList()
 
   ui_mount_list->clear();
   auto *defaultMount =
-      new QListWidgetItem(tr("%1 (default)").arg(get_base_path()));
-  defaultMount->setFlags(Qt::ItemFlag::NoItemFlags);
+      new QListWidgetItem(tr("[Default] %1").arg("base"));
+  // defaultMount->setFlags(Qt::ItemFlag::NoItemFlags);
   defaultMount->setData(Qt::UserRole, QString());
   ui_mount_list->addItem(defaultMount);
 
