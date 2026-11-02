@@ -137,7 +137,7 @@ bool extractArchive(const QString &archivePath, const QString &destination,
           "The archive contains hardlinks, which aren't supported."));
     }
 
-    const mode_t fileType = archive_entry_filetype(entry);
+    const auto fileType = archive_entry_filetype(entry);
     if (fileType == AE_IFLNK || archive_entry_symlink(entry) != nullptr) {
       archive_read_free(reader);
       return fail(QStringLiteral(
