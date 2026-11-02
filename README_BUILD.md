@@ -1,12 +1,13 @@
 ### Dependencies
 
-This program has five main dependencies
+This program has six main dependencies
 
 * Qt 5.6+ (https://www.qt.io/download)
 * BASS (http://www.un4seen.com/bass.html)
 * BASS Opus Plugin (http://www.un4seen.com/bass.html#addons)
 * Discord Rich Presence (https://github.com/discordapp/discord-rpc/releases)
 * Qt Apng Plugin (https://github.com/Skycoder42/QtApng/releases)
+* libarchive (https://libarchive.org/)
 
 ### Help
 
@@ -23,6 +24,8 @@ After going through the OS-specific steps below, compiling in Qt creator should 
 #### Windows
 
 If you're on Windows, you need to go find all the dependencies (see above) and put them in the lib/ folder.
+libarchive is available through vcpkg. Configure CMake with the vcpkg toolchain and use `x64-windows-static`, for example:
+`& "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install libarchive:x64-windows-static`
 
 #### MacOS
 

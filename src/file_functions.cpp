@@ -1,5 +1,6 @@
 #include "file_functions.h"
 
+#include <QFile>
 #include <QProcess>
 #include <QStandardPaths>
 
@@ -164,6 +165,55 @@ bool moveDirectoryInto(const QString &sourcePath, const QString &destPath,
     // than deleting anything else, but let the user know.
     qWarning() << "Copied" << sourcePath << "to" << destPath
                << "but could not remove the original folder";
+  }
+  return true;
+}
+
+bool moveFileInto(const QString &sourcePath, const QString &destPath,
+                  QString *error)
+{
+  if (QFile::rename(sourcePath, destPath)) {
+    return true;
+  }
+
+  if (!QFile::copy(sourcePath, destPath)) {
+    if (error != nullptr) {
+      *error = QObject::tr("Couldn't move %1.")
+                   .arg(QFileInfo(sourcePath).fileName());
+    }
+    return false;
+  }
+
+  if (!QFile::remove(sourcePath)) {
+    qWarning() << "Copied" << sourcePath << "to" << destPath
+               << "but could not remove the original file";
+  }
+  return true;
+}
+
+bool moveDirectoryContentsInto(const QString &sourcePath,
+                               const QString &destPath, QString *error)
+{
+  if (!QDir().mkpath(destPath)) {
+    if (error != nullptr) {
+      *error = QObject::tr("Couldn't create the destination folder.");
+    }
+    return false;
+  }
+
+  const QFileInfoList entries = QDir(sourcePath).entryInfoList(
+      QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System,
+      QDir::Name);
+  for (const QFileInfo &entry : entries) {
+    const QString destination = QDir(destPath).filePath(entry.fileName());
+    if (entry.isDir()) {
+      if (!moveDirectoryInto(entry.absoluteFilePath(), destination, error)) {
+        return false;
+      }
+    }
+    else if (!moveFileInto(entry.absoluteFilePath(), destination, error)) {
+      return false;
+    }
   }
   return true;
 }

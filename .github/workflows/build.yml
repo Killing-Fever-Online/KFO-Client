@@ -84,6 +84,22 @@ jobs:
 
           test -f lib/discord_rpc.h
 
+      - name: Install Linux libarchive
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y libarchive-dev
+
+      - name: Install Windows libarchive
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install libarchive:x64-windows-static
+
+      - name: Install macOS libarchive
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: brew install libarchive
+
       - name: Install Windows Discord RPC
         if: matrix.platform == 'windows'
         shell: bash
@@ -229,6 +245,8 @@ jobs:
           cmake -B build -S . `
             -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
             -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
             -DAO_ENABLE_DISCORD_RPC=ON
 
@@ -240,7 +258,7 @@ jobs:
           cmake -B build -S . \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
+            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR};$(brew --prefix libarchive)" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
             -DAO_ENABLE_DISCORD_RPC=OFF
 

@@ -52,6 +52,9 @@ public:
   /// Path to the packages folder (with trailing slash).
   QString packagesPath() const;
 
+  /// Scans packages immediately without waiting for the watcher debounce.
+  void rescanNow();
+
 signals:
   /// Emitted when the effective mount order changes, whether from an explicit
   /// save or from a package folder appearing/disappearing.

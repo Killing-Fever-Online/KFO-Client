@@ -304,6 +304,8 @@ void AOOptionsDialog::updateValues()
 
 void AOOptionsDialog::savePressed()
 {
+  processPendingPackageRemovals();
+
   bool l_reload_theme_required =
       (ui_theme_combobox->currentText() != Options::getInstance().theme()) ||
       (ui_theme_scaling_factor_sb->value() !=
@@ -322,7 +324,11 @@ void AOOptionsDialog::savePressed()
   close();
 }
 
-void AOOptionsDialog::discardPressed() { close(); }
+void AOOptionsDialog::discardPressed()
+{
+  m_pendingPackageRemovals.clear();
+  close();
+}
 
 void AOOptionsDialog::buttonClicked(QAbstractButton *button)
 {
@@ -752,9 +758,29 @@ void AOOptionsDialog::setupUI()
     if (ui_mount_list->row(item) <= 0) return;
 
     MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
-    if (manager != nullptr &&
-        manager->isPackageEntry(item->data(Qt::UserRole).toString())) {
-      return;
+    const QString entry = item->data(Qt::UserRole).toString();
+    if (manager != nullptr && manager->isPackageEntry(entry)) {
+      QMessageBox box(this);
+      box.setIcon(QMessageBox::Warning);
+      box.setWindowTitle(tr("Remove package"));
+      box.setText(tr("Remove package \"%1\"?").arg(entry));
+      box.setInformativeText(
+          tr("The package folder will be moved to the system Trash when you "
+             "press Save.\n\nIf the Trash isn't available, you'll be warned "
+             "before anything is permanently deleted."));
+
+      auto *removeButton =
+          box.addButton(tr("Remove"), QMessageBox::DestructiveRole);
+      auto *cancelButton = box.addButton(QMessageBox::Cancel);
+      box.setDefaultButton(cancelButton);
+      box.setEscapeButton(cancelButton);
+      box.exec();
+
+      if (box.clickedButton() != removeButton) {
+        return;
+      }
+
+      m_pendingPackageRemovals.insert(entry);
     }
 
     delete item;
@@ -801,12 +827,7 @@ void AOOptionsDialog::setupUI()
     QString path;
     auto selected = ui_mount_list->selectedItems();
     if (!selected.isEmpty() && ui_mount_list->row(selected[0]) > 0) {
-      const QString entry = selected[0]->data(Qt::UserRole).toString();
-      if (!entry.isEmpty()) {
-        path = QFileInfo(entry).isAbsolute()
-                   ? entry
-                   : QDir(get_app_dir_path()).filePath(entry);
-      }
+      path = mountEntryPath(selected[0]->data(Qt::UserRole).toString());
     }
     if (path.isEmpty()) {
       path = get_base_path();
@@ -822,10 +843,7 @@ void AOOptionsDialog::setupUI()
     bool row_selected = !selected_items.isEmpty() &&
                         ui_mount_list->row(selected_items[0]) > 0;
     MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
-    bool removable =
-        row_selected && manager != nullptr &&
-        !manager->isPackageEntry(selected_items[0]->data(Qt::UserRole).toString());
-    ui_mount_remove->setEnabled(removable);
+    ui_mount_remove->setEnabled(row_selected && manager != nullptr);
     ui_mount_up->setEnabled(row_selected);
     ui_mount_down->setEnabled(row_selected);
 
@@ -967,6 +985,16 @@ QString AOOptionsDialog::mountDisplayText(const QString &entry) const
   return tr("[External] %1").arg(entry);
 }
 
+QString AOOptionsDialog::mountEntryPath(const QString &entry) const
+{
+  if (entry.isEmpty()) {
+    return {};
+  }
+  return QFileInfo(entry).isAbsolute()
+             ? entry
+             : QDir(get_app_dir_path()).filePath(entry);
+}
+
 bool AOOptionsDialog::mountEntryIsListed(const QString &entry) const
 {
   for (int i = 1; i < ui_mount_list->count(); ++i) {
@@ -999,6 +1027,67 @@ void AOOptionsDialog::populateMountList()
     addMountItem(entry);
   }
   emit ui_mount_list->itemSelectionChanged();
+}
+
+void AOOptionsDialog::processPendingPackageRemovals()
+{
+  if (m_pendingPackageRemovals.isEmpty()) {
+    return;
+  }
+
+  const QSet<QString> pending = m_pendingPackageRemovals;
+  for (const QString &entry : pending) {
+    const QString path = mountEntryPath(entry);
+    if (path.isEmpty() || !QFileInfo::exists(path)) {
+      m_pendingPackageRemovals.remove(entry);
+      continue;
+    }
+
+    QString pathInTrash;
+    if (QFile::moveToTrash(path, &pathInTrash)) {
+      m_pendingPackageRemovals.remove(entry);
+      asset_cache_dirty = true;
+      continue;
+    }
+
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Warning);
+    box.setWindowTitle(tr("Couldn't move package to Trash"));
+    box.setText(
+        tr("The package folder \"%1\" couldn't be moved to the system Trash.")
+            .arg(entry));
+    box.setInformativeText(
+        tr("The Trash may not be available on this system. You can delete the "
+           "folder permanently instead, or keep the package mounted."));
+
+    auto *deleteButton =
+        box.addButton(tr("Delete permanently"), QMessageBox::DestructiveRole);
+    auto *keepButton =
+        box.addButton(tr("Keep package"), QMessageBox::RejectRole);
+    box.setDefaultButton(keepButton);
+    box.setEscapeButton(keepButton);
+    box.exec();
+
+    bool removed = false;
+    if (box.clickedButton() == deleteButton) {
+      removed = QDir(path).removeRecursively();
+      if (!removed) {
+        QMessageBox::warning(
+            this, tr("Couldn't delete package"),
+            tr("The package folder \"%1\" couldn't be deleted. It will stay "
+               "mounted.")
+                .arg(entry));
+      }
+    }
+
+    m_pendingPackageRemovals.remove(entry);
+    if (removed) {
+      asset_cache_dirty = true;
+    }
+    else if (!mountEntryIsListed(entry)) {
+      addMountItem(entry);
+    }
+  }
 }
 
 void AOOptionsDialog::saveMountList()
@@ -1037,7 +1126,9 @@ void AOOptionsDialog::saveMountList()
       merged.append(entry);
     }
     for (const QString &entry : current) {
-      if (manager->isPackageEntry(entry) && !listed.contains(entry)) {
+      if (manager->isPackageEntry(entry) && !listed.contains(entry) &&
+          !m_pendingPackageRemovals.contains(entry) &&
+          QFileInfo(mountEntryPath(entry)).isDir()) {
         merged.append(entry);
       }
     }
@@ -1086,7 +1177,8 @@ void AOOptionsDialog::onMountsChanged()
     listed.insert(ui_mount_list->item(i)->data(Qt::UserRole).toString());
   }
   for (const QString &entry : current) {
-    if (!manager->isPackageEntry(entry) || listed.contains(entry)) {
+    if (!manager->isPackageEntry(entry) || listed.contains(entry) ||
+        m_pendingPackageRemovals.contains(entry)) {
       continue;
     }
     addMountItem(entry);

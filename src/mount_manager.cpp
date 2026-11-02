@@ -209,6 +209,16 @@ bool MountManager::setEntries(const QStringList &entries)
 
 QString MountManager::packagesPath() const { return m_packagesPath; }
 
+void MountManager::rescanNow()
+{
+  m_scanPending = false;
+  if (!QDir(m_packagesPath).exists()) {
+    QDir().mkpath(m_packagesPath);
+  }
+  refreshWatchPath();
+  scanPackages(false);
+}
+
 bool MountManager::readMountsFile(QStringList &entries) const
 {
   QFile file(m_mountsFilePath);
@@ -266,6 +276,10 @@ bool MountManager::scanPackages(bool forceWrite)
       continue;
     }
 
+    if (packageName.startsWith(QLatin1Char('.'))) {
+      continue;
+    }
+
     if (QFileInfo(QDir(m_packagesPath).filePath(packageName)).isDir()) {
       updated.append(entry);
 #ifdef Q_OS_WIN
@@ -289,6 +303,10 @@ bool MountManager::scanPackages(bool forceWrite)
 
   for (const QFileInfo &folder : std::as_const(folders)) {
     const QString name = folder.fileName();
+
+    if (name.startsWith(QLatin1Char('.'))) {
+      continue;
+    }
 #ifdef Q_OS_WIN
     const QString key = name.toLower();
 #else

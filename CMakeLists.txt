@@ -16,10 +16,13 @@ option(AO_ENABLE_DISCORD_RPC "Enable Discord Rich Presence" ON)
 
 find_package(QT NAMES Qt6 Core Gui MultimediaWidgets Network Widgets Concurrent WebSockets UiTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui MultimediaWidgets Network Widgets Concurrent WebSockets UiTools)
+find_package(LibArchive REQUIRED)
 
 qt_add_executable(Attorney_Online
   src/main.cpp
   src/aoapplication.h
+  src/archive_drop_handler.h
+  src/archive_extractor.h
   src/aoblipplayer.h
   src/aobutton.h
   src/aocharbutton.h
@@ -51,6 +54,7 @@ qt_add_executable(Attorney_Online
   src/mount_manager.h
   src/networkmanager.h
   src/options.h
+  src/package_installer.h
   src/scrolltext.h
   src/text_file_functions.h
   src/interfaces/server_dialog.h
@@ -62,6 +66,8 @@ qt_add_executable(Attorney_Online
   src/widgets/moderator_dialog.h
   src/widgets/playerlistwidget.h
 src/aoapplication.cpp
+  src/archive_drop_handler.cpp
+  src/archive_extractor.cpp
   src/aoblipplayer.cpp
   src/aobutton.cpp
   src/aocharbutton.cpp
@@ -95,6 +101,7 @@ src/aoapplication.cpp
   src/mount_manager.cpp
   src/networkmanager.cpp
   src/options.cpp
+  src/package_installer.cpp
   src/packet_distribution.cpp
   src/path_functions.cpp
   src/scrolltext.cpp
@@ -120,6 +127,7 @@ target_link_libraries(Attorney_Online PRIVATE
   Qt${QT_VERSION_MAJOR}::Concurrent
   Qt${QT_VERSION_MAJOR}::WebSockets
   Qt${QT_VERSION_MAJOR}::UiTools
+  LibArchive::LibArchive
   bass
   bassopus
   bassmidi
