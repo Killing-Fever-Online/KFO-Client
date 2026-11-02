@@ -1,4 +1,5 @@
 #include "courtroom.h"
+#include "mount_manager.h"
 #include "options.h"
 
 void Courtroom::initialize_evidence()
@@ -417,7 +418,7 @@ void Courtroom::on_evidence_image_button_clicked()
     return;
 
   QString filename = filenames.at(0);
-  QStringList bases = Options::getInstance().mountPaths();
+  QStringList bases = ao_app->mounts()->resolvedMountPaths();
   bases.prepend(get_base_path());
   for (const QString &base : bases) {
     QDir baseDir(base);

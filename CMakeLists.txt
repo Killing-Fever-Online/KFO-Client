@@ -48,6 +48,7 @@ qt_add_executable(Attorney_Online
   src/mediatester.h
   src/misc_functions.h
   src/moderation_functions.h
+  src/mount_manager.h
   src/networkmanager.h
   src/options.h
   src/scrolltext.h
@@ -91,6 +92,7 @@ src/aoapplication.cpp
   src/mediatester.cpp
   src/misc_functions.cpp
   src/moderation_functions.cpp
+  src/mount_manager.cpp
   src/networkmanager.cpp
   src/options.cpp
   src/packet_distribution.cpp

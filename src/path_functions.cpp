@@ -1,6 +1,7 @@
 #include "aoapplication.h"
 #include "courtroom.h"
 #include "file_functions.h"
+#include "mount_manager.h"
 #include "options.h"
 
 #include <QDir>
@@ -395,7 +396,7 @@ QString AOApplication::get_real_path(const VPath &vpath,
   }
 
   // Cache miss; try all known mount paths
-  QStringList bases = Options::getInstance().mountPaths();
+  QStringList bases = m_mounts->resolvedMountPaths();
   bases.prepend(get_base_path());
   // base
   // content 1

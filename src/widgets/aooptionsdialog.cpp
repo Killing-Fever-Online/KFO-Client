@@ -3,6 +3,7 @@
 #include "aoapplication.h"
 #include "bass.h"
 #include "file_functions.h"
+#include "mount_manager.h"
 #include "networkmanager.h"
 #include "options.h"
 
@@ -10,12 +11,16 @@
 #include <QCollator>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QFile>
+#include <QFileInfo>
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QResource>
+#include <QSet>
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QUiLoader>
@@ -32,6 +37,10 @@ AOOptionsDialog::AOOptionsDialog(QDialog *parent, AOApplication *p_ao_app, int i
 {
   ao_app = p_ao_app;
   setupUI();
+  if (ao_app != nullptr && ao_app->mounts() != nullptr) {
+    connect(ao_app->mounts(), &MountManager::changed, this,
+            &AOOptionsDialog::onMountsChanged);
+  }
   ui_settings_tabs->setCurrentIndex(initial_tab);
 }
 
@@ -247,7 +256,10 @@ void AOOptionsDialog::registerOption(const QString &widgetName,
 void AOOptionsDialog::updateValues()
 {
   QSet<QString> themes;
-  QStringList bases = Options::getInstance().mountPaths();
+  QStringList bases;
+  if (ao_app != nullptr && ao_app->mounts() != nullptr) {
+    bases = ao_app->mounts()->resolvedMountPaths();
+  }
   bases.push_front(get_base_path());
 
   for (const QString &base : bases) {
@@ -648,39 +660,104 @@ void AOOptionsDialog::setupUI()
 
   // Asset tab
   FROM_UI(QListWidget, mount_list)
-  auto *defaultMount =
-      new QListWidgetItem(tr("%1 (default)").arg(get_base_path()));
-  defaultMount->setFlags(Qt::ItemFlag::NoItemFlags);
-  ui_mount_list->addItem(defaultMount);
-  registerOption<QListWidget, QStringList>("mount_list", &Options::mountPaths,
-                                           &Options::setMountPaths);
+  OptionEntry mountEntry;
+  mountEntry.load = [this] { populateMountList(); };
+  mountEntry.save = [this] { saveMountList(); };
+  optionEntries.append(mountEntry);
 
   FROM_UI(QPushButton, mount_add)
   connect(ui_mount_add, &QPushButton::clicked, this, [this] {
     QString path = QFileDialog::getExistingDirectory(
-        this, tr("Select a base folder"), get_app_dir_path(),
+        this, tr("Select a base folder or package"), get_app_dir_path(),
         QFileDialog::ShowDirsOnly);
     if (path.isEmpty()) {
       return;
     }
-    QDir dir(get_app_dir_path());
-    QString relative = dir.relativeFilePath(path);
-    if (!relative.contains("../")) {
-      path = relative;
+
+    MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
+    if (manager == nullptr) {
+      return;
     }
-    QListWidgetItem *dir_item = new QListWidgetItem(path);
-    ui_mount_list->addItem(dir_item);
-    ui_mount_list->setCurrentItem(dir_item);
+
+    QString entry = manager->entryForPath(path);
+    if (entry.isEmpty() || manager->containsEntry(entry) ||
+        mountEntryIsListed(entry)) {
+      return;
+    }
+
+    // Folders outside packages/ can either stay where they are or be moved
+    // into the packages folder so the client discovers them automatically.
+    if (!manager->isPackageEntry(entry)) {
+      QMessageBox box(this);
+      box.setIcon(QMessageBox::Question);
+      box.setWindowTitle(tr("Add asset folder"));
+      box.setText(tr("Do you want to move this folder into your packages folder?"));
+      box.setInformativeText(
+          tr("Add as external: the folder won't be moved and the client will reference it from the outside. "
+             "Packages live only within the client folder.\n"
+             "Move into packages: move the entire folder into your packages folder. "
+             "Please make sure you actually selected a valid package folder.\n"
+             "(NOTE: 'move into packages' is deliberately disabled in this beta)")
+          );
+
+      auto *externalButton =
+          box.addButton(tr("Add as external"), QMessageBox::ActionRole);
+      auto *moveButton =
+          box.addButton(tr("Move into packages"), QMessageBox::ActionRole);
+      auto *cancelButton = box.addButton(QMessageBox::Cancel);
+      // disable for now this is like absurdly dangerous
+      // this should only happen for zip files honestly, full folder copy is crazy
+      moveButton->setDisabled(true);
+      box.setDefaultButton(externalButton);
+      box.setEscapeButton(cancelButton);
+      box.exec();
+
+      if (box.clickedButton() == cancelButton) {
+        return;
+      }
+
+      if (box.clickedButton() == moveButton) {
+        // early return for safety. Function deliberately not implemented yet.
+        return;
+
+        const QString destPath = QDir(manager->packagesPath())
+                                     .filePath(QFileInfo(path).fileName());
+        QString error;
+        if (!moveDirectoryInto(path, destPath, &error)) {
+          QMessageBox::warning(this, tr("Couldn't move folder"), error);
+          return;
+        }
+
+        entry = manager->entryForPath(destPath);
+        if (entry.isEmpty()) {
+          return;
+        }
+      }
+    }
+
+    addMountItem(entry);
+    ui_mount_list->setCurrentRow(ui_mount_list->count() - 1);
 
     // quick hack to update buttons
     emit ui_mount_list->itemSelectionChanged();
+    asset_cache_dirty = true;
   });
 
   FROM_UI(QPushButton, mount_remove)
   connect(ui_mount_remove, &QPushButton::clicked, this, [this] {
     auto selected = ui_mount_list->selectedItems();
     if (selected.isEmpty()) return;
-    delete selected[0];
+
+    QListWidgetItem *item = selected[0];
+    if (ui_mount_list->row(item) <= 0) return;
+
+    MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
+    if (manager != nullptr &&
+        manager->isPackageEntry(item->data(Qt::UserRole).toString())) {
+      return;
+    }
+
+    delete item;
     emit ui_mount_list->itemSelectionChanged();
     asset_cache_dirty = true;
   });
@@ -691,6 +768,7 @@ void AOOptionsDialog::setupUI()
     if (selected.isEmpty()) return;
     auto *item = selected[0];
     int row = ui_mount_list->row(item);
+    if (row <= 0) return;
     ui_mount_list->takeItem(row);
     int new_row = qMax(1, row - 1);
     ui_mount_list->insertItem(new_row, item);
@@ -704,8 +782,9 @@ void AOOptionsDialog::setupUI()
     if (selected.isEmpty()) return;
     auto *item = selected[0];
     int row = ui_mount_list->row(item);
+    if (row <= 0) return;
     ui_mount_list->takeItem(row);
-    int new_row = qMin(ui_mount_list->count() + 1, row + 1);
+    int new_row = qMin(ui_mount_list->count(), row + 1);
     ui_mount_list->insertItem(new_row, item);
     ui_mount_list->setCurrentRow(new_row);
     asset_cache_dirty = true;
@@ -717,10 +796,36 @@ void AOOptionsDialog::setupUI()
     ui_mount_clear_cache->setEnabled(false);
   });
 
+  FROM_UI(QPushButton, mount_open_folder)
+  connect(ui_mount_open_folder, &QPushButton::clicked, this, [this] {
+    QString path;
+    auto selected = ui_mount_list->selectedItems();
+    if (!selected.isEmpty() && ui_mount_list->row(selected[0]) > 0) {
+      const QString entry = selected[0]->data(Qt::UserRole).toString();
+      if (!entry.isEmpty()) {
+        path = QFileInfo(entry).isAbsolute()
+                   ? entry
+                   : QDir(get_app_dir_path()).filePath(entry);
+      }
+    }
+    if (path.isEmpty()) {
+      path = get_base_path();
+    }
+    if (!dir_exists(path)) {
+      return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+  });
+
   connect(ui_mount_list, &QListWidget::itemSelectionChanged, this, [this] {
     auto selected_items = ui_mount_list->selectedItems();
-    bool row_selected = !ui_mount_list->selectedItems().isEmpty();
-    ui_mount_remove->setEnabled(row_selected);
+    bool row_selected = !selected_items.isEmpty() &&
+                        ui_mount_list->row(selected_items[0]) > 0;
+    MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
+    bool removable =
+        row_selected && manager != nullptr &&
+        !manager->isPackageEntry(selected_items[0]->data(Qt::UserRole).toString());
+    ui_mount_remove->setEnabled(removable);
     ui_mount_up->setEnabled(row_selected);
     ui_mount_down->setEnabled(row_selected);
 
@@ -844,6 +949,151 @@ void AOOptionsDialog::setupUI()
   });
   FROM_UI(QTabWidget, settings_tabs)
   updateValues();
+}
+
+void AOOptionsDialog::addMountItem(const QString &entry)
+{
+  auto *item = new QListWidgetItem(mountDisplayText(entry));
+  item->setData(Qt::UserRole, entry);
+  ui_mount_list->addItem(item);
+}
+
+QString AOOptionsDialog::mountDisplayText(const QString &entry) const
+{
+  MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
+  if (manager != nullptr && manager->isPackageEntry(entry)) {
+    return tr("[Package] %1").arg(entry);
+  }
+  return tr("[External] %1").arg(entry);
+}
+
+bool AOOptionsDialog::mountEntryIsListed(const QString &entry) const
+{
+  for (int i = 1; i < ui_mount_list->count(); ++i) {
+    if (ui_mount_list->item(i)->data(Qt::UserRole).toString() == entry) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void AOOptionsDialog::populateMountList()
+{
+  if (ui_mount_list == nullptr) {
+    return;
+  }
+
+  ui_mount_list->clear();
+  auto *defaultMount =
+      new QListWidgetItem(tr("[Default] %1").arg("base"));
+  // defaultMount->setFlags(Qt::ItemFlag::NoItemFlags);
+  defaultMount->setData(Qt::UserRole, QString());
+  ui_mount_list->addItem(defaultMount);
+
+  MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
+  if (manager == nullptr) {
+    return;
+  }
+
+  for (const QString &entry : manager->entries()) {
+    addMountItem(entry);
+  }
+  emit ui_mount_list->itemSelectionChanged();
+}
+
+void AOOptionsDialog::saveMountList()
+{
+  if (ui_mount_list == nullptr) {
+    return;
+  }
+
+  QStringList entries;
+  QSet<QString> listed;
+  for (int i = 1; i < ui_mount_list->count(); ++i) {
+    const QString entry =
+        ui_mount_list->item(i)->data(Qt::UserRole).toString();
+    if (entry.isEmpty()) {
+      continue;
+    }
+    entries.append(entry);
+    listed.insert(entry);
+  }
+
+  MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
+  if (manager != nullptr) {
+    const QStringList current = manager->entries();
+    QSet<QString> currentSet;
+    for (const QString &entry : current) {
+      currentSet.insert(entry);
+    }
+
+    // Drop package entries whose folders disappeared while the dialog was
+    // open, and merge packages that appeared after the list was populated.
+    QStringList merged;
+    for (const QString &entry : entries) {
+      if (manager->isPackageEntry(entry) && !currentSet.contains(entry)) {
+        continue;
+      }
+      merged.append(entry);
+    }
+    for (const QString &entry : current) {
+      if (manager->isPackageEntry(entry) && !listed.contains(entry)) {
+        merged.append(entry);
+      }
+    }
+    entries = merged;
+  }
+
+  m_applyingMountChange = true;
+  if (manager != nullptr) {
+    manager->setEntries(entries);
+  }
+  m_applyingMountChange = false;
+  asset_cache_dirty = true;
+}
+
+void AOOptionsDialog::onMountsChanged()
+{
+  if (m_applyingMountChange || ui_mount_list == nullptr) {
+    return;
+  }
+
+  MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
+  if (manager == nullptr) {
+    return;
+  }
+
+  const QStringList current = manager->entries();
+  QSet<QString> currentPackages;
+  for (const QString &entry : current) {
+    if (manager->isPackageEntry(entry)) {
+      currentPackages.insert(entry);
+    }
+  }
+
+  // Remove packages whose folders were deleted.
+  for (int i = ui_mount_list->count() - 1; i >= 1; --i) {
+    const QString entry =
+        ui_mount_list->item(i)->data(Qt::UserRole).toString();
+    if (manager->isPackageEntry(entry) && !currentPackages.contains(entry)) {
+      delete ui_mount_list->takeItem(i);
+    }
+  }
+
+  // Append newly discovered packages, preserving the user's local order.
+  QSet<QString> listed;
+  for (int i = 1; i < ui_mount_list->count(); ++i) {
+    listed.insert(ui_mount_list->item(i)->data(Qt::UserRole).toString());
+  }
+  for (const QString &entry : current) {
+    if (!manager->isPackageEntry(entry) || listed.contains(entry)) {
+      continue;
+    }
+    addMountItem(entry);
+    listed.insert(entry);
+  }
+
+  emit ui_mount_list->itemSelectionChanged();
 }
 
 void AOOptionsDialog::onTimestampFormatEdited()

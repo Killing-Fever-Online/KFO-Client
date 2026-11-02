@@ -129,6 +129,7 @@ private:
   QPushButton *ui_mount_up;
   QPushButton *ui_mount_down;
   QPushButton *ui_mount_clear_cache;
+  QPushButton *ui_mount_open_folder;
 
   // The logging tab
   QCheckBox *ui_downwards_cb;
@@ -156,10 +157,18 @@ private:
   QTextBrowser *ui_privacy_policy;
 
   bool asset_cache_dirty = false;
+  bool m_applyingMountChange = false;
 
   bool needsDefaultAudioDevice();
   void populateAudioDevices();
   void updateValues();
+
+  void populateMountList();
+  void saveMountList();
+  void onMountsChanged();
+  void addMountItem(const QString &entry);
+  QString mountDisplayText(const QString &entry) const;
+  bool mountEntryIsListed(const QString &entry) const;
 
   QVector<OptionEntry> optionEntries;
 
