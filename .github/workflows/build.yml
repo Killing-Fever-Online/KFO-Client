@@ -40,6 +40,11 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    env:
+      # The CI only builds Release, so don't spend time compiling vcpkg debug
+      # libraries on Windows.
+      VCPKG_BUILD_TYPE: release
+
     steps:
       - uses: actions/checkout@v6
         with:
@@ -83,6 +88,44 @@ jobs:
           cp ./discord-rpc/linux-dynamic/include/discord*.h ./lib/
 
           test -f lib/discord_rpc.h
+
+      - name: Install Linux libarchive
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y libarchive-dev
+
+      - name: Configure Windows vcpkg binary cache
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          "VCPKG_BINARY_SOURCES=clear;files,${{ github.workspace }}/vcpkg-cache,readwrite" >> $env:GITHUB_ENV
+
+      - name: Restore Windows vcpkg binary cache
+        if: matrix.platform == 'windows'
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg-cache
+          key: vcpkg-${{ runner.os }}-x64-windows-libarchive-v1
+
+      - name: Restore Windows vcpkg downloads
+        if: matrix.platform == 'windows'
+        uses: actions/cache@v4
+        with:
+          path: C:/vcpkg/downloads
+          key: vcpkg-downloads-${{ runner.os }}-v2
+          restore-keys: |
+            vcpkg-downloads-${{ runner.os }}-
+
+      - name: Install Windows libarchive
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libarchive[core,bzip2,lz4,lzma,zstd]:x64-windows"
+
+      - name: Install macOS libarchive
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: brew install libarchive
 
       - name: Install Windows Discord RPC
         if: matrix.platform == 'windows'
@@ -229,6 +272,8 @@ jobs:
           cmake -B build -S . `
             -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
             -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
             -DAO_ENABLE_DISCORD_RPC=ON
 
@@ -240,7 +285,7 @@ jobs:
           cmake -B build -S . \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
+            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR};$(brew --prefix libarchive)" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
             -DAO_ENABLE_DISCORD_RPC=OFF
 
@@ -282,6 +327,18 @@ jobs:
           rm -f ./imageformats/qtiff.dll ./imageformats/qicns.dll ./imageformats/qico.dll
           rm -f ./imageformats/qsvg.dll ./imageformats/qtga.dll ./imageformats/qwbmp.dll
           rm -rf iconengines bearer
+
+      - name: Deploy Windows libarchive DLLs
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $vcpkgBin = Join-Path $env:VCPKG_INSTALLATION_ROOT 'installed\x64-windows\bin'
+          $outputDir = Join-Path $env:GITHUB_WORKSPACE 'bin'
+          Copy-Item (Join-Path $vcpkgBin '*.dll') $outputDir -Force
+
+          if (-not (Test-Path (Join-Path $outputDir 'archive.dll'))) {
+            throw "archive.dll was not found in $vcpkgBin"
+          }
 
       # ----------------------------------------------------------------
       # Deploy — Linux AppImage

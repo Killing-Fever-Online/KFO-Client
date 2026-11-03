@@ -1,5 +1,6 @@
 #include "aoapplication.h"
 
+#include "archive_drop_handler.h"
 #include "bassmidi.h"
 #include "courtroom.h"
 #include "debug_functions.h"
@@ -8,6 +9,7 @@
 #include "mount_manager.h"
 #include "networkmanager.h"
 #include "options.h"
+#include "package_installer.h"
 
 #include "widgets/aooptionsdialog.h"
 
@@ -36,6 +38,11 @@ AOApplication::AOApplication(int &argc, char **argv) : QApplication(argc, argv)
   m_mounts->initialize();
   connect(m_mounts, &MountManager::changed, this,
           [this] { invalidate_lookup_cache(); });
+
+  m_package_installer = new PackageInstaller(m_mounts, this);
+  connect(m_package_installer, &PackageInstaller::packagesChanged, this,
+          [this] { invalidate_lookup_cache(); });
+  m_archive_drop_handler = new ArchiveDropHandler(m_package_installer, this);
 
   asset_lookup_cache.reserve(2048);
 

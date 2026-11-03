@@ -24,6 +24,7 @@ class QRadioButton;
 #include <QtWidgets/QDialog>
 #include <QDirIterator>
 #include <QListWidget>
+#include <QSet>
 #include <QTextBrowser>
 #include <QTextStream>
 #include <QTableWidget>
@@ -158,6 +159,7 @@ private:
 
   bool asset_cache_dirty = false;
   bool m_applyingMountChange = false;
+  QSet<QString> m_pendingPackageRemovals;
 
   bool needsDefaultAudioDevice();
   void populateAudioDevices();
@@ -165,9 +167,11 @@ private:
 
   void populateMountList();
   void saveMountList();
+  void processPendingPackageRemovals();
   void onMountsChanged();
   void addMountItem(const QString &entry);
   QString mountDisplayText(const QString &entry) const;
+  QString mountEntryPath(const QString &entry) const;
   bool mountEntryIsListed(const QString &entry) const;
 
   QVector<OptionEntry> optionEntries;

@@ -35,6 +35,8 @@ class Lobby;
 class Courtroom;
 class Options;
 class MountManager;
+class PackageInstaller;
+class ArchiveDropHandler;
 
 class VPath : QString {
   using QString::QString;
@@ -408,6 +410,8 @@ private:
   const int HOTFIX = 0;
 
   MountManager *m_mounts = nullptr;
+  PackageInstaller *m_package_installer = nullptr;
+  ArchiveDropHandler *m_archive_drop_handler = nullptr;
 
   QVector<server_type> server_list;
   QHash<uint, QString> asset_lookup_cache;
