@@ -105,7 +105,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/vcpkg-cache
-          key: vcpkg-${{ runner.os }}-x64-windows-static-md-libarchive-v1
+          key: vcpkg-${{ runner.os }}-x64-windows-libarchive-v1
 
       - name: Restore Windows vcpkg downloads
         if: matrix.platform == 'windows'
@@ -120,7 +120,7 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libarchive[core,bzip2,lz4,lzma,zstd]:x64-windows-static-md"
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libarchive[core,bzip2,lz4,lzma,zstd]:x64-windows"
 
       - name: Install macOS libarchive
         if: matrix.platform == 'macos'
@@ -273,7 +273,7 @@ jobs:
             -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows-static-md `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
             -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
             -DAO_ENABLE_DISCORD_RPC=ON
 
@@ -327,6 +327,18 @@ jobs:
           rm -f ./imageformats/qtiff.dll ./imageformats/qicns.dll ./imageformats/qico.dll
           rm -f ./imageformats/qsvg.dll ./imageformats/qtga.dll ./imageformats/qwbmp.dll
           rm -rf iconengines bearer
+
+      - name: Deploy Windows libarchive DLLs
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $vcpkgBin = Join-Path $env:VCPKG_INSTALLATION_ROOT 'installed\x64-windows\bin'
+          $outputDir = Join-Path $env:GITHUB_WORKSPACE 'bin'
+          Copy-Item (Join-Path $vcpkgBin '*.dll') $outputDir -Force
+
+          if (-not (Test-Path (Join-Path $outputDir 'libarchive.dll'))) {
+            throw "libarchive.dll was not found in $vcpkgBin"
+          }
 
       # ----------------------------------------------------------------
       # Deploy — Linux AppImage
