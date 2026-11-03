@@ -1160,7 +1160,7 @@ void AOOptionsDialog::addMountItem(const QString &entry)
 
     QStringList lines;
     lines.append(QStringLiteral("<b>%1</b>")
-                     .arg(plainTextToHtml(tr("[Package] %1").arg(displayName))));
+                     .arg(plainTextToHtml(displayName)));
     if (!metadata.description.isEmpty()) {
       lines.append(plainTextToHtml(metadata.description));
     }
