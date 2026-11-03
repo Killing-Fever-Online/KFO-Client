@@ -336,8 +336,8 @@ jobs:
           $outputDir = Join-Path $env:GITHUB_WORKSPACE 'bin'
           Copy-Item (Join-Path $vcpkgBin '*.dll') $outputDir -Force
 
-          if (-not (Test-Path (Join-Path $outputDir 'libarchive.dll'))) {
-            throw "libarchive.dll was not found in $vcpkgBin"
+          if (-not (Test-Path (Join-Path $outputDir 'archive.dll'))) {
+            throw "archive.dll was not found in $vcpkgBin"
           }
 
       # ----------------------------------------------------------------
