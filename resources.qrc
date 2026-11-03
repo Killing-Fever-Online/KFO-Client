@@ -57,5 +57,6 @@
         <file>resource/logo_kfo.ico</file>
         <file>resource/logo_kfo.png</file>
         <file>resource/logo_kfo.icns</file>
+        <file>resource/ui/lobby_assets/players.svg</file>
     </qresource>
 </RCC>

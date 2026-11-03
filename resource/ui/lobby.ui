@@ -606,7 +606,11 @@ QHeaderView::section {
                </column>
                <column>
                 <property name="text">
-                 <string>👥</string>
+                 <string/>
+                </property>
+                <property name="icon">
+                 <iconset resource="../../resources.qrc">
+                  <normaloff>:/resource/ui/lobby_assets/players.svg</normaloff>:/resource/ui/lobby_assets/players.svg</iconset>
                 </property>
                </column>
               </widget>

@@ -55,6 +55,7 @@ qt_add_executable(Attorney_Online
   src/networkmanager.h
   src/options.h
   src/package_installer.h
+  src/package_metadata.h
   src/scrolltext.h
   src/text_file_functions.h
   src/interfaces/server_dialog.h
@@ -102,6 +103,7 @@ src/aoapplication.cpp
   src/networkmanager.cpp
   src/options.cpp
   src/package_installer.cpp
+  src/package_metadata.cpp
   src/packet_distribution.cpp
   src/path_functions.cpp
   src/scrolltext.cpp

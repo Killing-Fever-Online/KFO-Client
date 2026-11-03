@@ -6,27 +6,193 @@
 #include "mount_manager.h"
 #include "networkmanager.h"
 #include "options.h"
+#include "package_metadata.h"
 
 #include <QCheckBox>
 #include <QCollator>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QGroupBox>
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPlainTextEdit>
+#include <QPixmap>
 #include <QPushButton>
 #include <QResource>
+#include <QScrollBar>
 #include <QSet>
 #include <QSpinBox>
+#include <QStyle>
+#include <QStyledItemDelegate>
+#include <QStyleOptionViewItem>
 #include <QDoubleSpinBox>
+#include <QTableWidget>
+#include <QTextDocument>
+#include <QtMath>
 #include <QUiLoader>
 #include <QVBoxLayout>
-#include <QTableWidget>
 #include <QRadioButton>
+
+namespace {
+constexpr int kMountItemMargin = 6;
+constexpr int kMountIconSize = 64;
+constexpr int kMountIconSpacing = 10;
+
+QString plainTextToHtml(const QString &text)
+{
+  QString escaped = text.toHtmlEscaped();
+  escaped.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+  escaped.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+  escaped.replace(QLatin1Char('\n'), QStringLiteral("<br>"));
+  return escaped;
+}
+
+QSize mountIconExtent(const QStyleOptionViewItem &option)
+{
+  QSize extent = option.decorationSize;
+  extent.setWidth(qMax(extent.width(), kMountIconSize));
+  extent.setHeight(qMax(extent.height(), kMountIconSize));
+  return extent;
+}
+
+class MountItemDelegate : public QStyledItemDelegate {
+public:
+  explicit MountItemDelegate(QObject *parent = nullptr)
+      : QStyledItemDelegate(parent)
+  {
+  }
+
+  void paint(QPainter *painter, const QStyleOptionViewItem &option,
+             const QModelIndex &index) const override
+  {
+    QStyleOptionViewItem opt = option;
+    initStyleOption(&opt, index);
+
+    const QString html = opt.text;
+    const QIcon icon = opt.icon;
+
+    // Let the style paint the row background, focus and selection. The rich
+    // text and icon are drawn below so we can control their layout.
+    opt.text.clear();
+    opt.icon = QIcon();
+    QStyle *style = opt.widget != nullptr ? opt.widget->style()
+                                          : QApplication::style();
+    style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, opt.widget);
+
+    const QSize extent = mountIconExtent(opt);
+    const bool hasIcon = !icon.isNull();
+    QRect iconRect(opt.rect.left() + kMountItemMargin,
+                   opt.rect.top() + kMountItemMargin, extent.width(),
+                   extent.height());
+
+    if (hasIcon) {
+      const qreal dpr =
+          painter->device() != nullptr ? painter->device()->devicePixelRatioF()
+                                       : 1.0;
+      const QSize pixelSize(qRound(extent.width() * dpr),
+                            qRound(extent.height() * dpr));
+      const QPixmap source = icon.pixmap(pixelSize);
+      if (!source.isNull()) {
+        QPixmap scaled =
+            source.scaled(pixelSize, Qt::KeepAspectRatio,
+                          Qt::SmoothTransformation);
+        scaled.setDevicePixelRatio(dpr);
+        QRect target(iconRect.topLeft(),
+                     QSize(qRound(scaled.width() / dpr),
+                           qRound(scaled.height() / dpr)));
+        target.moveCenter(iconRect.center());
+        painter->drawPixmap(target, scaled);
+      }
+    }
+
+    const int textLeft = opt.rect.left() + kMountItemMargin +
+                         (hasIcon ? extent.width() + kMountIconSpacing : 0);
+    const int textWidth = opt.rect.right() - kMountItemMargin - textLeft + 1;
+    if (textWidth <= 0 || html.isEmpty()) {
+      return;
+    }
+
+    const bool selected = (opt.state & QStyle::State_Selected) != 0;
+    QPalette::ColorGroup colorGroup = QPalette::Active;
+    if ((opt.state & QStyle::State_Enabled) == 0) {
+      colorGroup = QPalette::Disabled;
+    }
+    else if ((opt.state & QStyle::State_Active) == 0) {
+      colorGroup = QPalette::Inactive;
+    }
+    const QColor textColor =
+        opt.palette.color(colorGroup, selected ? QPalette::HighlightedText
+                                               : QPalette::Text);
+
+    QTextDocument document;
+    document.setDocumentMargin(0);
+    document.setDefaultFont(opt.font);
+    document.setDefaultStyleSheet(
+        QStringLiteral("body { color: %1; }").arg(textColor.name()));
+    document.setHtml(html);
+    document.setTextWidth(textWidth);
+
+    const int textHeight = qCeil(document.size().height());
+    int textTop = opt.rect.top() + kMountItemMargin;
+    if (hasIcon && textHeight < extent.height()) {
+      textTop += (extent.height() - textHeight) / 2;
+    }
+
+    painter->save();
+    painter->setClipRect(opt.rect);
+    painter->translate(textLeft, textTop);
+    document.drawContents(painter);
+    painter->restore();
+  }
+
+  QSize sizeHint(const QStyleOptionViewItem &option,
+                 const QModelIndex &index) const override
+  {
+    QStyleOptionViewItem opt = option;
+    initStyleOption(&opt, index);
+
+    const QSize extent = mountIconExtent(opt);
+    const bool hasIcon = !opt.icon.isNull();
+
+    int width = opt.rect.width();
+    if (width <= 0 && opt.widget != nullptr) {
+      width = opt.widget->width();
+      if (const QAbstractItemView *view =
+              qobject_cast<const QAbstractItemView *>(opt.widget)) {
+        if (view->verticalScrollBar() != nullptr &&
+            view->verticalScrollBar()->isVisible()) {
+          width -= view->verticalScrollBar()->width();
+        }
+      }
+    }
+    if (width <= 0) {
+      width = 480;
+    }
+
+    const int textLeft =
+        kMountItemMargin + (hasIcon ? extent.width() + kMountIconSpacing : 0);
+    const int textWidth = qMax(1, width - textLeft - kMountItemMargin);
+
+    QTextDocument document;
+    document.setDocumentMargin(0);
+    document.setDefaultFont(opt.font);
+    document.setHtml(opt.text);
+    document.setTextWidth(textWidth);
+    const int textHeight = qCeil(document.size().height());
+
+    const int contentHeight =
+        hasIcon ? qMax(extent.height(), textHeight)
+                : qMax(textHeight, QFontMetrics(opt.font).height());
+    return QSize(width, contentHeight + 2 * kMountItemMargin);
+  }
+};
+} // namespace
 
 #define FROM_UI(type, name)                                                    \
   ;                                                                            \
@@ -666,6 +832,11 @@ void AOOptionsDialog::setupUI()
 
   // Asset tab
   FROM_UI(QListWidget, mount_list)
+  ui_mount_list->setItemDelegate(new MountItemDelegate(ui_mount_list));
+  ui_mount_list->setIconSize(QSize(kMountIconSize, kMountIconSize));
+  ui_mount_list->setWordWrap(true);
+  ui_mount_list->setUniformItemSizes(false);
+  ui_mount_list->setResizeMode(QListView::Adjust);
   OptionEntry mountEntry;
   mountEntry.load = [this] { populateMountList(); };
   mountEntry.save = [this] { saveMountList(); };
@@ -971,8 +1142,45 @@ void AOOptionsDialog::setupUI()
 
 void AOOptionsDialog::addMountItem(const QString &entry)
 {
-  auto *item = new QListWidgetItem(mountDisplayText(entry));
+  auto *item = new QListWidgetItem();
   item->setData(Qt::UserRole, entry);
+
+  MountManager *manager = ao_app != nullptr ? ao_app->mounts() : nullptr;
+  if (manager != nullptr && manager->isPackageEntry(entry)) {
+    const QString packageRoot = mountEntryPath(entry);
+    const PackageMetadata metadata = readPackageMetadata(packageRoot);
+
+    QString displayName = metadata.name;
+    if (displayName.isEmpty()) {
+      displayName = QFileInfo(packageRoot).fileName();
+    }
+    if (displayName.isEmpty()) {
+      displayName = entry;
+    }
+
+    QStringList lines;
+    lines.append(QStringLiteral("<b>%1</b>")
+                     .arg(plainTextToHtml(displayName)));
+    if (!metadata.description.isEmpty()) {
+      lines.append(plainTextToHtml(metadata.description));
+    }
+    if (!metadata.author.isEmpty()) {
+      lines.append(QStringLiteral("<i>%1</i>")
+                       .arg(plainTextToHtml(tr("by %1").arg(metadata.author))));
+    }
+    item->setText(lines.join(QStringLiteral("<br>")));
+
+    if (!metadata.icon.isEmpty()) {
+      const QIcon icon(QDir(packageRoot).filePath(metadata.icon));
+      if (!icon.isNull()) {
+        item->setIcon(icon);
+      }
+    }
+  }
+  else {
+    item->setText(plainTextToHtml(mountDisplayText(entry)));
+  }
+
   ui_mount_list->addItem(item);
 }
 
@@ -1013,7 +1221,7 @@ void AOOptionsDialog::populateMountList()
 
   ui_mount_list->clear();
   auto *defaultMount =
-      new QListWidgetItem(tr("[Default] %1").arg("base"));
+      new QListWidgetItem(plainTextToHtml(tr("[Default] %1").arg("base")));
   // defaultMount->setFlags(Qt::ItemFlag::NoItemFlags);
   defaultMount->setData(Qt::UserRole, QString());
   ui_mount_list->addItem(defaultMount);

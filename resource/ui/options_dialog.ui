@@ -1435,7 +1435,7 @@ Keep in mind only you will not be able to see them!</string>
           </sizepolicy>
          </property>
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The folders to be scanned for assets (characters, backgrounds, music, sfx). packages/ folder is scanned automatically. &amp;quot;Add...&amp;quot; button mounts external path instead.&lt;/p&gt;&lt;p&gt;↑ top as lowest priority, ↓ bottom as highest.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The folders to be scanned for assets (characters, backgrounds, music, sfx). packages/ folder is scanned automatically. You can also &lt;span style=&quot; font-weight:700;&quot;&gt;drag and drop&lt;/span&gt; archives here (zip/rar/7z) to add them!&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;↑ top as lowest priority, ↓ bottom as highest.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
