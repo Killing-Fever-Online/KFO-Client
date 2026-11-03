@@ -24,8 +24,8 @@ After going through the OS-specific steps below, compiling in Qt creator should 
 #### Windows
 
 If you're on Windows, you need to go find all the dependencies (see above) and put them in the lib/ folder.
-libarchive is available through vcpkg. Configure CMake with the vcpkg toolchain and use `x64-windows-static`, for example:
-`& "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install libarchive:x64-windows-static`
+libarchive is available through vcpkg. Configure CMake with the vcpkg toolchain and use `x64-windows-static-md`. For example:
+`& "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libarchive[core,bzip2,lz4,lzma,zstd]:x64-windows-static-md"`
 
 #### MacOS
 

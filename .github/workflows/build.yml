@@ -105,7 +105,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/vcpkg-cache
-          key: vcpkg-${{ runner.os }}-x64-windows-static-libarchive-v2
+          key: vcpkg-${{ runner.os }}-x64-windows-static-md-libarchive-v1
 
       - name: Restore Windows vcpkg downloads
         if: matrix.platform == 'windows'
@@ -120,7 +120,7 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libarchive[core,lzma,zstd]:x64-windows-static"
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libarchive[core,bzip2,lz4,lzma,zstd]:x64-windows-static-md"
 
       - name: Install macOS libarchive
         if: matrix.platform == 'macos'
@@ -273,7 +273,7 @@ jobs:
             -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static-md `
             -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
             -DAO_ENABLE_DISCORD_RPC=ON
 
