@@ -10,6 +10,14 @@ ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/"
 
 cd ${ROOT_DIR}
 
+# libarchive is used to install dropped zip/7z/rar packages.
+# Homebrew is keg-only, so expose its headers/library to CMake.
+if command -v brew >/dev/null 2>&1; then
+  brew install libarchive
+  export CMAKE_PREFIX_PATH="$(brew --prefix libarchive):${CMAKE_PREFIX_PATH:-}"
+  echo "When configuring CMake, include $(brew --prefix libarchive) in CMAKE_PREFIX_PATH."
+fi
+
 LIB_TARGET="../../lib"
 BASS_LINK="http://uk.un4seen.com/files/bass24-osx.zip"
 BASSOPUS_LINK="http://www.un4seen.com/files/bassopus24-osx.zip"

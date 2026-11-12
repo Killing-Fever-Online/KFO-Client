@@ -35,6 +35,9 @@ class Lobby;
 class Courtroom;
 class Options;
 class WebCache;
+class MountManager;
+class PackageInstaller;
+class ArchiveDropHandler;
 
 class VPath : QString {
   using QString::QString;
@@ -69,6 +72,7 @@ public:
 
   WebCache *webcache() const;
 
+  MountManager *mounts() const { return m_mounts; }
 
   QFont default_font;
 
@@ -186,7 +190,6 @@ public:
 
   ////// Functions for reading and writing files //////
   // Implementations file_functions.cpp
-
   // returns all of the file's lines in a QStringList
   QStringList get_list_file(VPath path);
   QStringList get_list_file(QString p_file);
@@ -406,17 +409,23 @@ public:
 
 private:
   const QString GENERATION = "KFO";
-  const QString VERSION_STATUS = "Beta"; // Release, RC, Beta
+  const QString VERSION_STATUS = "Beta 6"; // Release, RC, Beta
   const int RELEASE = 2;
   const int MAJOR_VERSION = 10;
   const int MINOR_VERSION = 1;
   const int HOTFIX = 0;
 
   WebCache *m_webcache = nullptr;
+  MountManager *m_mounts = nullptr;
+  PackageInstaller *m_package_installer = nullptr;
+  ArchiveDropHandler *m_archive_drop_handler = nullptr;
+
   QVector<server_type> server_list;
   QHash<uint, QString> asset_lookup_cache;
   QHash<uint, QString> dir_listing_cache;
   QSet<uint> dir_listing_exist_cache;
+
+  bool m_reconnecting = false;
 
 public slots:
   void server_disconnected();

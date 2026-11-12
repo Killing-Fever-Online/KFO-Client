@@ -7,24 +7,26 @@
 **[Refer to the docs](https://github.com/AttorneyOnline/docs/blob/master/docs/index.md) for more information.**
 
 Linux users will need to install the system dependencies related to Qt. These are the commands to run on a terminal for some distributions:
-* Ubuntu 22.04 LTS:
+* Ubuntu 24.04 LTS:
 ```
-$ sudo apt-get install qt5base-dev libqt5websockets5 qt5-image-formats-plugins libqt5svg5
+$ sudo apt-get install qt6-base-dev libqt6websockets6-dev qt6-image-formats-plugins libqt6svg6-dev qt6-multimedia-dev
 ```
 * Arch:
 ```
-$ sudo pacman -Syu qt5-base qt5-websockets qt5-imageformats qt5-svg
+$ sudo pacman -Syu qt6-base qt6-websockets qt6-imageformats qt6-svg qt6-multimedia
 ```
 * Fedora:
 ```
-$ sudo dnf install qt5-qtbase qt5-qtwebsockets qt5-qtimageformats qt5-qtsvg
+$ sudo dnf install qt6-qtbase qt6-qtwebsockets qt6-qtimageformats qt6-qtsvg qt6-qtmultimedia
 ```
 
 ## Credits
 
 This is a open-source remake of Attorney Online written by OmniTroid. The original Attorney Online client was written by FanatSors in Delphi.
 
-The logo (`logo.png` and `logo.ico`) was designed by Lucas Carbi. The characters depicted in the logo are owned by Capcom.
+The logo (`logo_kfo.png` and `logo_kfo.ico`) was designed by the Killing Fever Online community.
+
+The server browser interface was designed by Ellym (Konoe). The characters depicted on it belong to the Ace Attorney series by Capcom.
 
 ### Project
 
@@ -40,7 +42,7 @@ Killing Fever Online additions copyright (c) 2019 Crystalwarrior
 
 ### Qt
 
-This project uses Qt 5, which is licensed under the [GNU Lesser General Public License](https://www.gnu.org/licenses/lgpl-3.0.txt) with [certain licensing restrictions and exceptions](https://www.qt.io/qt-licensing-terms/). To comply with licensing requirements for static linking, object code is available if you would like to relink with an alternative version of Qt, and the source code for Qt may be found at https://github.com/qt/qtbase, http://code.qt.io/cgit/, or at https://qt.io.
+This project uses Qt 6, which is licensed under the [GNU Lesser General Public License](https://www.gnu.org/licenses/lgpl-3.0.txt) with [certain licensing restrictions and exceptions](https://www.qt.io/qt-licensing-terms/). To comply with licensing requirements for static linking, object code is available if you would like to relink with an alternative version of Qt, and the source code for Qt may be found at https://github.com/qt/qtbase, http://code.qt.io/cgit/, or at https://qt.io.
 
 Copyright (c) 2016 The Qt Company Ltd.
 
@@ -49,3 +51,9 @@ Copyright (c) 2016 The Qt Company Ltd.
 This project depends on the BASS shared library. Get it here: http://www.un4seen.com/
 
 Copyright (c) 1999-2016 Un4seen Developments Ltd. All rights reserved.
+
+### Noto Emoji
+
+This project bundles the Noto Color Emoji font (`resource/fonts/NotoColorEmoji.ttf`), licensed under the [SIL Open Font License 1.1](https://scripts.sil.org/OFL). The source is available at https://github.com/googlefonts/noto-emoji.
+
+Copyright (c) 2013-2017 Google Inc. and Arjen Nienhuis

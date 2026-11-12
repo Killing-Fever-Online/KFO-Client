@@ -122,9 +122,6 @@ void Courtroom::refresh_emotes()
 
 void Courtroom::set_emote_page()
 {
-  if (m_cid == -1)
-    return;
-
   int total_emotes = ao_app->get_emote_number(current_char);
 
   ui_emote_left->hide();
@@ -145,7 +142,7 @@ void Courtroom::set_emote_page()
     else
       emotes_on_page = total_emotes % max_emotes_on_page;
   }
-  else
+  else if (total_emotes != 0)
     emotes_on_page = max_emotes_on_page;
 
   if (total_pages > current_emote_page + 1)

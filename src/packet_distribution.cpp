@@ -148,7 +148,8 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
       typing_timer_supported = true;
     if (f_packet.contains("video_support", Qt::CaseInsensitive))
       video_supported = true;
-  log_to_demo = false;
+    log_to_demo = false;
+    Q_EMIT net_manager->server_ready();
   }
   else if (header == "PN") {
     if (!lobby_constructed || f_contents.size() < 2)
@@ -262,7 +263,6 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
     if (!courtroom_constructed)
       goto end;
     w_courtroom->clear_chars();
-    w_courtroom->clear_pair_list();
     w_courtroom->clear_mute();
     for (int n_element = 0; n_element < f_contents.size(); ++n_element) {
       QStringList sub_elements = f_contents.at(n_element).split("&");
@@ -516,7 +516,12 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
   }
   else if (header == "BB") {
     if (courtroom_constructed && !f_contents.isEmpty()) {
-      call_notice(f_contents.at(0));
+      int secs = 0;
+      QString msg = f_contents.at(0);
+      if (f_contents.size() >= 2) {
+        secs = f_contents.at(0).toInt();
+      }
+      call_notice(msg, secs);
     }
     log_to_demo = false;
   }
@@ -793,6 +798,25 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
     QUrl t_asset_url = QUrl::fromPercentEncoding(f_contents.at(0).toUtf8());
     if (t_asset_url.isValid())
     asset_url = t_asset_url.toString();
+  }
+  // AO 2.11 player list: register a player (PR) or update one of its fields (PU).
+  else if (header == "PR") {
+    if (!courtroom_constructed || f_contents.size() < 2) {
+      goto end;
+    }
+    PlayerRegister update{
+        f_contents.at(0).toInt(),
+        PlayerRegister::REGISTER_TYPE(f_contents.at(1).toInt())};
+    w_courtroom->playerList()->registerPlayer(update);
+  }
+  else if (header == "PU") {
+    if (!courtroom_constructed || f_contents.size() < 3) {
+      goto end;
+    }
+    PlayerUpdate update{f_contents.at(0).toInt(),
+                        PlayerUpdate::DATA_TYPE(f_contents.at(1).toInt()),
+                        f_contents.at(2)};
+    w_courtroom->playerList()->updatePlayer(update);
   }
 
   if (log_to_demo) {

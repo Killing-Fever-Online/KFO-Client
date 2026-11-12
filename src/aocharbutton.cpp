@@ -68,7 +68,7 @@ void AOCharButton::set_image(QString p_character)
 {
   character = p_character;
   VPath char_path = ao_app->get_character_path(p_character, "char_icon");
-  QString image_path = ao_app->get_image_suffix(char_path, true);
+  QString image_path = ao_app->get_real_path(char_path, {".png"});
 
   // WebCache DL the character icon
   if (Options::getInstance().webcacheEnabled() && !file_exists(image_path)) {

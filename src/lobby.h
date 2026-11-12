@@ -42,8 +42,10 @@ private:
   void get_motd();
   void check_for_updates();
   void reset_selection();
+  bool connect_to_selected_server();
 
   int last_index = -1;
+  bool join_after_connect = false;
 
   enum TabPage { SERVER, FAVORITES, DEMOS };
 
@@ -97,6 +99,7 @@ private slots:
   void on_edit_favorite_released();
   void on_remove_from_fav_released();
   void on_load_demo_released();
+  void on_connect_released();
   void on_about_clicked();
   void on_server_list_clicked(QTreeWidgetItem *p_item, int column);
   void on_list_doubleclicked(QTreeWidgetItem *p_item, int column);

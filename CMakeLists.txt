@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.7.0)
+cmake_minimum_required(VERSION 3.21)
 
-project(Attorney_Online VERSION 2.11.0.0 LANGUAGES CXX C)
+project(Attorney_Online VERSION 2.10.1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,15 +10,19 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(AO_ENABLE_DISCORD_RPC "Enable Discord Rich Presence" ON)
 
 find_package(QT NAMES Qt6 Core Gui MultimediaWidgets Network Widgets Concurrent WebSockets UiTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui MultimediaWidgets Network Widgets Concurrent WebSockets UiTools)
+find_package(LibArchive REQUIRED)
 
 qt_add_executable(Attorney_Online
   src/main.cpp
   src/aoapplication.h
+  src/archive_drop_handler.h
+  src/archive_extractor.h
   src/aoblipplayer.h
   src/aobutton.h
   src/aocharbutton.h
@@ -46,8 +50,12 @@ qt_add_executable(Attorney_Online
   src/lobby.h
   src/mediatester.h
   src/misc_functions.h
+  src/moderation_functions.h
+  src/mount_manager.h
   src/networkmanager.h
   src/options.h
+  src/package_installer.h
+  src/package_metadata.h
   src/scrolltext.h
   src/text_file_functions.h
   src/interfaces/server_dialog.h
@@ -55,9 +63,13 @@ qt_add_executable(Attorney_Online
   src/widgets/add_server_dialog.h
   src/widgets/aooptionsdialog.h
   src/widgets/direct_connect_dialog.h
-  src/webcache.h
   src/widgets/edit_server_dialog.h
+  src/widgets/moderator_dialog.h
+  src/widgets/playerlistwidget.h
+  src/webcache.h
 src/aoapplication.cpp
+  src/archive_drop_handler.cpp
+  src/archive_extractor.cpp
   src/aoblipplayer.cpp
   src/aobutton.cpp
   src/aocharbutton.cpp
@@ -87,8 +99,12 @@ src/aoapplication.cpp
   src/lobby.cpp
   src/mediatester.cpp
   src/misc_functions.cpp
+  src/moderation_functions.cpp
+  src/mount_manager.cpp
   src/networkmanager.cpp
   src/options.cpp
+  src/package_installer.cpp
+  src/package_metadata.cpp
   src/packet_distribution.cpp
   src/path_functions.cpp
   src/scrolltext.cpp
@@ -97,8 +113,10 @@ src/aoapplication.cpp
   src/widgets/add_server_dialog.cpp
   src/widgets/aooptionsdialog.cpp
   src/widgets/direct_connect_dialog.cpp
-  src/webcache.cpp
   src/widgets/edit_server_dialog.cpp
+  src/widgets/moderator_dialog.cpp
+  src/widgets/playerlistwidget.cpp
+  src/webcache.cpp
   resources.qrc
 )
 
@@ -113,6 +131,7 @@ target_link_libraries(Attorney_Online PRIVATE
   Qt${QT_VERSION_MAJOR}::Concurrent
   Qt${QT_VERSION_MAJOR}::WebSockets
   Qt${QT_VERSION_MAJOR}::UiTools
+  LibArchive::LibArchive
   bass
   bassopus
   bassmidi
@@ -131,4 +150,41 @@ if(WIN32)
     set(APP_ICON_RESOURCE_WINDOWS "${CMAKE_CURRENT_SOURCE_DIR}/resource/logo-client.rc")
     target_sources(Attorney_Online PRIVATE ${APP_ICON_RESOURCE_WINDOWS})
   endif()
+endif()
+
+if(APPLE)
+    set(MACOSX_BUNDLE_ICON "${CMAKE_CURRENT_LIST_DIR}/resource/logo_kfo.icns")
+    target_sources(Attorney_Online PRIVATE ${MACOSX_BUNDLE_ICON})
+    set_source_files_properties(${MACOSX_BUNDLE_ICON} PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources)
+
+    set_target_properties(Attorney_Online PROPERTIES
+        OUTPUT_NAME "Attorney Online"
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "Attorney Online"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.attorneyonline.AttorneyOnline"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_ICON_FILE "logo_kfo.icns"
+    )
+
+    # Copy necessary resources/plugins into the bundle
+    if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/bin/imageformats/libqapng.dylib")
+        add_custom_command(TARGET Attorney_Online POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_DIR:Attorney_Online>/Contents/PlugIns/imageformats"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_LIST_DIR}/bin/imageformats/libqapng.dylib"
+                "$<TARGET_BUNDLE_DIR:Attorney_Online>/Contents/PlugIns/imageformats/"
+            VERBATIM
+        )
+    endif()
+
+    if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/bin/base")
+        add_custom_command(TARGET Attorney_Online POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_LIST_DIR}/bin/base"
+                "$<TARGET_BUNDLE_DIR:Attorney_Online>/Contents/Resources/base"
+            VERBATIM
+        )
+    endif()
 endif()

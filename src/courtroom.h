@@ -13,6 +13,7 @@
 #include "aolayer.h"
 #include "aomusicplayer.h"
 #include "widgets/aooptionsdialog.h"
+#include "widgets/playerlistwidget.h"
 #include "aopacket.h"
 #include "aosfxplayer.h"
 #include "aotextarea.h"
@@ -92,7 +93,6 @@ public:
   void append_area(QString f_area) { area_list.append(f_area); }
   void clear_chars() { char_list.clear(); }
   void clear_mute() { ui_mute_list->clear(); }
-  void clear_pair_list() { ui_pair_list->clear(); }
   void clear_music() { music_list.clear(); }
   void clear_areas() { area_list.clear(); }
 
@@ -198,9 +198,6 @@ public:
 
   // sets the local mute list based on characters available on the server
   void set_mute_list();
-
-  // Sets the local pair list based on the characters available on the server.
-  void set_pair_list();
 
   // sets desk and bg based on pos in chatmessage
   void set_scene(bool show_desk, QString f_side);
@@ -401,6 +398,8 @@ public:
 
   void on_authentication_state_received(int p_state);
 
+  PlayerListWidget *playerList();
+
   enum JudgeState {
       POS_DEPENDENT = -1,
       HIDE_CONTROLS =  0,
@@ -410,6 +409,8 @@ public:
   JudgeState get_judge_state() { return judge_state; }
   void set_judge_state(JudgeState new_state) { judge_state = new_state; }
   void set_judge_buttons() { show_judge_controls(ao_app->get_pos_is_judge(selected_side)); }
+
+  QString ooc_name = "";
 
   ~Courtroom();
 private:
@@ -461,6 +462,9 @@ private:
 
   // 0 = in front, 1 = behind
   int pair_order = 0;
+
+  // True when the theme defines the standard AO2 2.11 "player_list" position.
+  bool player_list_themed = false;
 
   // RP clock
   int m_current_clock = 0;
@@ -783,6 +787,7 @@ private:
   AOTextArea *ui_server_chatlog;
 
   QListWidget *ui_mute_list;
+  PlayerListWidget *ui_player_list;
   QTreeWidget *ui_area_list;
   QTreeWidget *ui_music_list;
 
@@ -797,7 +802,6 @@ private:
   AOImage *ui_rp_clock;
 
   AOButton *ui_pair_button;
-  QListWidget *ui_pair_list;
   QSpinBox *ui_pair_offset_spinbox;
   QSpinBox *ui_pair_vert_offset_spinbox;
 
@@ -922,7 +926,8 @@ private:
   QWidget *ui_char_buttons;
 
   QVector<AOCharButton *> ui_char_button_list;
-  QVector<AOCharButton *> ui_char_button_list_filtered;
+  QVector<int> ui_char_button_list_filtered;
+  QVector<QTreeWidgetItem *> ui_char_list_items;
 
   AOButton *ui_back_to_lobby;
 
@@ -942,6 +947,7 @@ private:
   void set_char_select_page();
   void char_clicked(int n_char);
   void on_char_button_context_menu_requested(const QPoint &pos);
+  void ensure_char_button_pool(int count);
   void put_button_in_place(int starting, int chars_on_this_page);
   void filter_character_list();
 
@@ -993,7 +999,7 @@ private slots:
   void chat_tick();
 
   void on_mute_list_clicked(QModelIndex p_index);
-  void on_pair_list_clicked(QModelIndex p_index);
+  void on_player_pair_requested(int playerId, const QString &character);
 
   void on_ooc_return_pressed();
   void on_ooc_commands_load(bool file_load, QString filename);

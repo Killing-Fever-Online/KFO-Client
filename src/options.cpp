@@ -529,14 +529,9 @@ void Options::setDefaultScalingMode(QString value)
   config.setValue("default_scaling", value);
 }
 
-QStringList Options::mountPaths() const
+QStringList Options::legacyMountPaths() const
 {
   return config.value("mount_paths").value<QStringList>();
-}
-
-void Options::setMountPaths(QStringList value)
-{
-  config.setValue("mount_paths", value);
 }
 
 bool Options::playerCountOptout() const
@@ -551,7 +546,8 @@ void Options::setPlayerCountOptout(bool value)
 
 bool Options::playSelectedSFXOnIdle() const
 {
-  return config.value("sfx_on_idle", false).toBool();
+  // Why was this flipped false by default?!?!?
+  return config.value("sfx_on_idle", true).toBool();
 }
 
 void Options::setPlaySelectedSFXOnIdle(bool value)
@@ -742,6 +738,19 @@ QStringList Options::callwords() const
 void Options::setCallwords(QStringList value)
 {
   config.setValue("callwords", value);
+}
+
+QString Options::playerlistFormatString() const
+{
+  return config
+      .value("visuals/playerlist_format",
+             "[{id}] {character} {displayname} {username}")
+      .toString();
+}
+
+void Options::setPlayerlistFormatString(QString value)
+{
+  config.setValue("visuals/playerlist_format", value);
 }
 
 bool Options::callwords_WholeWord() const

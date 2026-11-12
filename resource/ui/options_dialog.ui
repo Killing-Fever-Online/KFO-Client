@@ -6,12 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>522</width>
-    <height>415</height>
+    <width>638</width>
+    <height>428</height>
    </rect>
   </property>
   <property name="contextMenuPolicy">
-   <enum>Qt::NoContextMenu</enum>
+   <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
   </property>
   <property name="windowTitle">
    <string>Settings</string>
@@ -20,10 +20,10 @@
    <item>
     <widget class="QTabWidget" name="settings_tabs">
      <property name="focusPolicy">
-      <enum>Qt::NoFocus</enum>
+      <enum>Qt::FocusPolicy::NoFocus</enum>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>4</number>
      </property>
      <widget class="QWidget" name="gameplay_tab">
       <attribute name="title">
@@ -39,9 +39,9 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-427</y>
-            <width>466</width>
-            <height>771</height>
+            <y>0</y>
+            <width>582</width>
+            <height>870</height>
            </rect>
           </property>
           <layout class="QFormLayout" name="formLayout">
@@ -111,10 +111,10 @@
            <item row="5" column="1">
             <widget class="QFrame" name="theme_log_divider">
              <property name="frameShape">
-              <enum>QFrame::HLine</enum>
+              <enum>QFrame::Shape::HLine</enum>
              </property>
              <property name="frameShadow">
-              <enum>QFrame::Sunken</enum>
+              <enum>QFrame::Shadow::Sunken</enum>
              </property>
             </widget>
            </item>
@@ -178,7 +178,7 @@
               <string>Chat Rate Limit:</string>
              </property>
              <property name="textFormat">
-              <enum>Qt::AutoText</enum>
+              <enum>Qt::TextFormat::AutoText</enum>
              </property>
             </widget>
            </item>
@@ -195,10 +195,10 @@
            <item row="10" column="1">
             <widget class="QFrame" name="log_names_divider">
              <property name="frameShape">
-              <enum>QFrame::HLine</enum>
+              <enum>QFrame::Shape::HLine</enum>
              </property>
              <property name="frameShadow">
-              <enum>QFrame::Sunken</enum>
+              <enum>QFrame::Shadow::Sunken</enum>
              </property>
             </widget>
            </item>
@@ -252,10 +252,10 @@
            <item row="14" column="1">
             <widget class="QFrame" name="net_divider">
              <property name="frameShape">
-              <enum>QFrame::HLine</enum>
+              <enum>QFrame::Shape::HLine</enum>
              </property>
              <property name="frameShadow">
-              <enum>QFrame::Sunken</enum>
+              <enum>QFrame::Shadow::Sunken</enum>
              </property>
             </widget>
            </item>
@@ -351,17 +351,17 @@
            <item row="18" column="1">
             <widget class="QComboBox" name="scaling_combobox">
              <property name="contextMenuPolicy">
-              <enum>Qt::CustomContextMenu</enum>
+              <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
              </property>
             </widget>
            </item>
            <item row="20" column="0" colspan="2">
             <spacer name="verticalSpacer_3">
              <property name="orientation">
-              <enum>Qt::Vertical</enum>
+              <enum>Qt::Orientation::Vertical</enum>
              </property>
              <property name="sizeType">
-              <enum>QSizePolicy::Fixed</enum>
+              <enum>QSizePolicy::Policy::Fixed</enum>
              </property>
              <property name="sizeHint" stdset="0">
               <size>
@@ -375,7 +375,7 @@
             <widget class="QWidget" name="gridWidget" native="true">
              <layout class="QGridLayout" name="checkboxLayout">
               <property name="sizeConstraint">
-               <enum>QLayout::SetDefaultConstraint</enum>
+               <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
               </property>
               <property name="leftMargin">
                <number>1</number>
@@ -447,7 +447,7 @@
               <item row="7" column="0" colspan="4">
                <widget class="Line" name="line">
                 <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
+                 <enum>Qt::Orientation::Horizontal</enum>
                 </property>
                </widget>
               </item>
@@ -831,10 +831,10 @@
        <item>
         <spacer name="verticalSpacer">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Fixed</enum>
+          <enum>QSizePolicy::Policy::Fixed</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -854,10 +854,10 @@
        <item>
         <spacer name="verticalSpacer_2">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Fixed</enum>
+          <enum>QSizePolicy::Policy::Fixed</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -916,10 +916,10 @@
 Double click the items to download them!</string>
              </property>
              <property name="editTriggers">
-              <set>QAbstractItemView::NoEditTriggers</set>
+              <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
              </property>
              <property name="selectionMode">
-              <enum>QAbstractItemView::SingleSelection</enum>
+              <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
              </property>
              <property name="iconSize">
               <size>
@@ -981,10 +981,10 @@ Double click the items to download them!</string>
 Double click the items to download them!</string>
              </property>
              <property name="editTriggers">
-              <set>QAbstractItemView::NoEditTriggers</set>
+              <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
              </property>
              <property name="selectionMode">
-              <enum>QAbstractItemView::SingleSelection</enum>
+              <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
              </property>
              <property name="iconSize">
               <size>
@@ -1102,10 +1102,10 @@ Double click the items to download them!</string>
 }</string>
            </property>
            <property name="frameShape">
-            <enum>QFrame::StyledPanel</enum>
+            <enum>QFrame::Shape::StyledPanel</enum>
            </property>
            <property name="frameShadow">
-            <enum>QFrame::Plain</enum>
+            <enum>QFrame::Shadow::Plain</enum>
            </property>
            <property name="lineWidth">
             <number>1</number>
@@ -1114,7 +1114,7 @@ Double click the items to download them!</string>
             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Callwords notify you every time a message contains them. Make sure to leave every callword in its own line!&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="alignment">
-            <set>Qt::AlignJustify|Qt::AlignVCenter</set>
+            <set>Qt::AlignmentFlag::AlignJustify|Qt::AlignmentFlag::AlignVCenter</set>
            </property>
            <property name="wordWrap">
             <bool>true</bool>
@@ -1159,7 +1159,7 @@ Double click the items to download them!</string>
                <string>Replace it with...</string>
               </property>
               <property name="cursorMoveStyle">
-               <enum>Qt::LogicalMoveStyle</enum>
+               <enum>Qt::CursorMoveStyle::LogicalMoveStyle</enum>
               </property>
              </widget>
             </item>
@@ -1205,7 +1205,7 @@ Double click the items to download them!</string>
 Keep in mind only you will not be able to see them!</string>
            </property>
            <property name="alignment">
-            <set>Qt::AlignJustify|Qt::AlignVCenter</set>
+            <set>Qt::AlignmentFlag::AlignJustify|Qt::AlignmentFlag::AlignVCenter</set>
            </property>
            <property name="wordWrap">
             <bool>true</bool>
@@ -1332,10 +1332,10 @@ Keep in mind only you will not be able to see them!</string>
           <number>100</number>
          </property>
          <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
          <property name="tickPosition">
-          <enum>QSlider::TicksAbove</enum>
+          <enum>QSlider::TickPosition::TicksAbove</enum>
          </property>
          <property name="tickInterval">
           <number>0</number>
@@ -1378,10 +1378,10 @@ Keep in mind only you will not be able to see them!</string>
           <number>100</number>
          </property>
          <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
          <property name="tickPosition">
-          <enum>QSlider::TicksAbove</enum>
+          <enum>QSlider::TickPosition::TicksAbove</enum>
          </property>
         </widget>
        </item>
@@ -1391,10 +1391,10 @@ Keep in mind only you will not be able to see them!</string>
           <number>100</number>
          </property>
          <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
          <property name="tickPosition">
-          <enum>QSlider::TicksAbove</enum>
+          <enum>QSlider::TickPosition::TicksAbove</enum>
          </property>
         </widget>
        </item>
@@ -1411,20 +1411,20 @@ Keep in mind only you will not be able to see them!</string>
        <item row="7" column="0" colspan="3">
         <widget class="QFrame" name="audio_volume_divider">
          <property name="frameShape">
-          <enum>QFrame::HLine</enum>
+          <enum>QFrame::Shape::HLine</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Sunken</enum>
+          <enum>QFrame::Shadow::Sunken</enum>
          </property>
         </widget>
        </item>
        <item row="12" column="0" colspan="3">
         <widget class="QFrame" name="volume_blip_divider">
          <property name="frameShape">
-          <enum>QFrame::HLine</enum>
+          <enum>QFrame::Shape::HLine</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Sunken</enum>
+          <enum>QFrame::Shadow::Sunken</enum>
          </property>
         </widget>
        </item>
@@ -1441,7 +1441,7 @@ Keep in mind only you will not be able to see them!</string>
        <item row="18" column="1">
         <spacer name="verticalSpacer">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -1453,6 +1453,19 @@ Keep in mind only you will not be able to see them!</string>
        </item>
        <item row="1" column="0" colspan="3">
         <widget class="QComboBox" name="audio_device_combobox"/>
+       </item>
+       <item row="18" column="0">
+        <widget class="QLabel" name="playerlist_format_lbl">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;Set the format for the player list to use.&lt;br&gt;&lt;br&gt;Valid fields are:&lt;br&gt;{id} - Client ID&lt;br&gt;{displayname} - Character display name&lt;br&gt;{character} - Character folder name&lt;br&gt;{username} - Out-of-character name&lt;br&gt;(Note: Some servers may hide out-of-character names.)&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>Playerlist Format:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="18" column="1">
+        <widget class="QLineEdit" name="playerlist_format_edit"/>
        </item>
       </layout>
      </widget>
@@ -1476,7 +1489,7 @@ Keep in mind only you will not be able to see them!</string>
           </sizepolicy>
          </property>
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add or remove base folders for use by assets.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;Base folders on the bottom are prioritized over those above them.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The folders to be scanned for assets (characters, backgrounds, music, sfx). packages/ folder is scanned automatically. You can also &lt;span style=&quot; font-weight:700;&quot;&gt;drag and drop&lt;/span&gt; archives here (zip/rar/7z) to add them!&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;↑ top as lowest priority, ↓ bottom as highest.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -1495,10 +1508,23 @@ Keep in mind only you will not be able to see them!</string>
        </item>
        <item>
         <layout class="QGridLayout" name="mount_buttons_layout">
+         <item row="2" column="1">
+          <widget class="QPushButton" name="mount_remove">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="text">
+            <string>Remove</string>
+           </property>
+          </widget>
+         </item>
          <item row="2" column="5">
           <spacer name="mount_buttons_spacer_2">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -1507,6 +1533,19 @@ Keep in mind only you will not be able to see them!</string>
             </size>
            </property>
           </spacer>
+         </item>
+         <item row="2" column="0">
+          <widget class="QPushButton" name="mount_add">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="text">
+            <string>Add...</string>
+           </property>
+          </widget>
          </item>
          <item row="2" column="4">
           <widget class="QPushButton" name="mount_down">
@@ -1521,26 +1560,13 @@ Keep in mind only you will not be able to see them!</string>
            </property>
           </widget>
          </item>
-         <item row="2" column="1">
-          <widget class="QPushButton" name="mount_remove">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="text">
-            <string>Remove</string>
-           </property>
-          </widget>
-         </item>
          <item row="2" column="2">
           <spacer name="mount_buttons_spacer">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeType">
-            <enum>QSizePolicy::Expanding</enum>
+            <enum>QSizePolicy::Policy::Expanding</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -1563,20 +1589,7 @@ Keep in mind only you will not be able to see them!</string>
            </property>
           </widget>
          </item>
-         <item row="2" column="0">
-          <widget class="QPushButton" name="mount_add">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="text">
-            <string>Add...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="6">
+         <item row="2" column="7">
           <widget class="QPushButton" name="mount_clear_cache">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -1590,6 +1603,16 @@ Use this when you have added an asset that takes precedence over another existin
            </property>
            <property name="text">
             <string>Clear Cache</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="6">
+          <widget class="QPushButton" name="mount_open_folder">
+           <property name="toolTip">
+            <string>Open the folder of the currently selected package, or base folder if nothing is selected.</string>
+           </property>
+           <property name="text">
+            <string>Open Folder</string>
            </property>
           </widget>
          </item>
@@ -1815,10 +1838,10 @@ Default: 0.</string>
        <item>
         <widget class="QFrame" name="privacy_separator">
          <property name="frameShape">
-          <enum>QFrame::HLine</enum>
+          <enum>QFrame::Shape::HLine</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Sunken</enum>
+          <enum>QFrame::Shadow::Sunken</enum>
          </property>
         </widget>
        </item>
@@ -1832,7 +1855,7 @@ Default: 0.</string>
    <item>
     <widget class="QDialogButtonBox" name="settings_buttons">
      <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::RestoreDefaults|QDialogButtonBox::Save</set>
+      <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::RestoreDefaults|QDialogButtonBox::StandardButton::Save</set>
      </property>
     </widget>
    </item>

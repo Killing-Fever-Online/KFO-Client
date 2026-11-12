@@ -23,7 +23,7 @@ void call_error(QString p_message)
   msgBox->exec();
 }
 
-void call_notice(QString p_message)
+void call_notice(QString p_message, int seconds)
 {
   auto *msgBox = new QMessageBox;
 
@@ -34,30 +34,32 @@ void call_notice(QString p_message)
 
   msgBox->setStandardButtons(QMessageBox::Ok);
   msgBox->setDefaultButton(QMessageBox::Ok);
-  msgBox->defaultButton()->setEnabled(false);
+  if (seconds > 0)
+  {
+    msgBox->defaultButton()->setEnabled(false);
 
-  QTimer intervalTimer;
-  intervalTimer.setInterval(1000);
+    QTimer intervalTimer;
+    intervalTimer.setInterval(1000);
 
-  int counter = 3;
-  const auto updateCounter = [msgBox, &counter] {
-    if (counter <= 0)
-      return;
-    msgBox->defaultButton()->setText(
-        QString("%1 (%2)").arg(QDialogButtonBox::tr("OK")).arg(counter));
-    counter--;
-  };
+    int counter = seconds;
+    const auto updateCounter = [msgBox, &counter] {
+      if (counter <= 0)
+        return;
+      msgBox->defaultButton()->setText(
+          QString("%1 (%2)").arg(QDialogButtonBox::tr("OK")).arg(counter));
+      counter--;
+    };
 
-  QObject::connect(&intervalTimer, &QTimer::timeout, msgBox, updateCounter);
-  intervalTimer.start();
-  updateCounter();
+    QObject::connect(&intervalTimer, &QTimer::timeout, msgBox, updateCounter);
+    intervalTimer.start();
+    updateCounter();
 
-  QTimer::singleShot(3000, msgBox, [msgBox, &intervalTimer] {
-    msgBox->defaultButton()->setEnabled(true);
-    msgBox->defaultButton()->setText(QDialogButtonBox::tr("OK"));
-    intervalTimer.stop();
-  });
-
+    QTimer::singleShot(seconds*1000, msgBox, [msgBox, &intervalTimer] {
+      msgBox->defaultButton()->setEnabled(true);
+      msgBox->defaultButton()->setText(QDialogButtonBox::tr("OK"));
+      intervalTimer.stop();
+    });
+  }
   msgBox->exec();  
 
 }

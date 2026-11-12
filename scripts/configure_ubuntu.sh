@@ -12,6 +12,8 @@ cd "${ROOT_DIR}"
 
 #need some openGL stuff
 sudo apt install libgl1-mesa-dev
+# libarchive is used to install dropped zip/7z/rar packages
+sudo apt install libarchive-dev
 #install curl incase of fresh vm
 sudo apt install curl
 

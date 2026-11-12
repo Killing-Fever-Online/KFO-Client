@@ -1,12 +1,16 @@
 #include "aoapplication.h"
 
+#include "archive_drop_handler.h"
 #include "bassmidi.h"
 #include "courtroom.h"
 #include "debug_functions.h"
+#include "file_functions.h"
 #include "lobby.h"
+#include "mount_manager.h"
 #include "networkmanager.h"
 #include "options.h"
 #include "webcache.h"
+#include "package_installer.h"
 
 #include "widgets/aooptionsdialog.h"
 
@@ -23,9 +27,24 @@ void message_handler(QtMsgType type, const QMessageLogContext &context,
 
 AOApplication::AOApplication(int &argc, char **argv) : QApplication(argc, argv)
 {
+  setApplicationName("Attorney Online");
+  // On macOS, we distribute with a built-in base in the .app but this is not writeable
+  // so we copy the base folder into the preferred base path (~/Library/Application Support/Attorney Online)
+  seed_base_if_missing();
+
   net_manager = new NetworkManager(this);
   discord = new AttorneyOnline::Discord();
   m_webcache = new WebCache(this);
+
+  m_mounts = new MountManager(this);
+  m_mounts->initialize();
+  connect(m_mounts, &MountManager::changed, this,
+          [this] { invalidate_lookup_cache(); });
+
+  m_package_installer = new PackageInstaller(m_mounts, this);
+  connect(m_package_installer, &PackageInstaller::packagesChanged, this,
+          [this] { invalidate_lookup_cache(); });
+  m_archive_drop_handler = new ArchiveDropHandler(m_package_installer, this);
 
   asset_lookup_cache.reserve(2048);
 
@@ -33,7 +52,7 @@ AOApplication::AOApplication(int &argc, char **argv) : QApplication(argc, argv)
   original_message_handler = qInstallMessageHandler(message_handler);
 
   setApplicationVersion(get_version_string());
-  setApplicationDisplayName(tr("Attorney Online Golden: %1").arg(applicationVersion()));
+  setApplicationDisplayName(tr("Attorney Online KFO: %1").arg(applicationVersion()));
 
   // Qt5 had hard-coded colors. Qt6 uses Windows accent color for several palette roles,
   // which breaks AO's UI since it wasn't designed with that in mind. Hard-code the colors.
@@ -141,37 +160,73 @@ QString AOApplication::get_version_string()
 
 void AOApplication::server_disconnected()
 {
-  if (courtroom_constructed) {
+  if (m_reconnecting)
+      return;
+
+  if (!courtroom_constructed)
+      return;
+
+  bool first_attempt = true;
+
+  while (true)
+  {
     QMessageBox msgBox;
-    msgBox.setText(tr("Disconnected from server."));
-    QPushButton* btn1 = msgBox.addButton(tr("Return to Lobby"), QMessageBox::AcceptRole);
-    QPushButton* btn2 = msgBox.addButton(tr("Reconnect"), QMessageBox::AcceptRole);
-    msgBox.setDefaultButton(btn1);
+    msgBox.setText(first_attempt
+                    ? tr("Disconnected from server.")
+                    : tr("Failed to reconnect to server."));
+    QPushButton *btn_lobby =
+        msgBox.addButton(tr("Return to Lobby"), QMessageBox::RejectRole);
+    QPushButton *btn_reconnect =
+        msgBox.addButton(tr("Reconnect"), QMessageBox::AcceptRole);
+    msgBox.setDefaultButton(btn_lobby);
     msgBox.exec();
-    if (msgBox.clickedButton() == btn1) {
-        construct_lobby();
-        destruct_courtroom();
-    } else if (msgBox.clickedButton() == btn2) {
-      net_manager->connect_to_server(net_manager->last_server_chosen);
-      QTimer::singleShot(4000, this, [this]() {
-          if (net_manager->established_connection) {
-              net_manager->join_to_server();
-              QString hdid = get_hdid();
-              send_server_packet(new AOPacket("RM"));
-              send_server_packet(new AOPacket("CC", {QString::number(client_id),
-                            QString::number(w_courtroom->get_cid()), hdid}));
-              call_notice(tr("Success reconnecting to server."));
-              // send_server_packet(new AOPacket("MC", w_courtroom->last_area_entered));
-          } else {
-              call_notice(tr("Failed to reconnect to server."));
-              construct_lobby();
-              destruct_courtroom();
-          }
-        qDebug() << net_manager->established_connection;
-      });
+    m_reconnecting = false;
+    if (msgBox.clickedButton() == btn_lobby)
+    {
+      Options::getInstance().setServerSubTheme(QString());
+      construct_lobby();
+      destruct_courtroom();
+      return;
     }
+    // Reconnect has been chosen! Make sure we're marked as reconnecting.
+    first_attempt = false;
+    m_reconnecting = true;
+    net_manager->connect_to_server(net_manager->last_server_chosen);
+
+    // Make sure to do an event loop just in case we quit out early
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+
+    bool success = false;
+    const QMetaObject::Connection conn =
+        connect(net_manager, &NetworkManager::server_connected, this,
+                [&](bool state) {
+                    success = state;
+                    loop.quit();
+                });
+    connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+    // Timeout in 10 seconds
+    timeout.start(10'000);
+
+    loop.exec();
+
+    disconnect(conn);
+    m_reconnecting = false;
+
+    if (success)
+    {
+      net_manager->join_to_server();
+      const QString hdid = get_hdid();
+      send_server_packet(new AOPacket("RD"));
+      send_server_packet(new AOPacket("CC", {QString::number(client_id),
+                                              QString::number(w_courtroom->get_cid()),
+                                              hdid}));
+      call_notice(tr("Success reconnecting to server."), 0);
+      return;
+    }
+    // If failed or timed out, re-show the same notice
   }
-  Options::getInstance().setServerSubTheme(QString());
 }
 
 void AOApplication::loading_cancelled()
@@ -191,6 +246,9 @@ void AOApplication::call_settings_menu(int initial_tab)
       if(lobby_constructed) {
       }
       l_dialog->exec();
+      if (courtroom_constructed) {
+        w_courtroom->playerList()->reloadPlayers();
+      }
       delete l_dialog;
 
     } catch (const std::exception &e) {

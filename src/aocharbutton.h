@@ -20,6 +20,7 @@ public:
   AOApplication *ao_app;
 
   QString character;
+  int char_id = -1;
 
   void refresh();
   void reset();

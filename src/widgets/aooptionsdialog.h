@@ -24,6 +24,7 @@ class QRadioButton;
 #include <QtWidgets/QDialog>
 #include <QDirIterator>
 #include <QListWidget>
+#include <QSet>
 #include <QTextBrowser>
 #include <QTextStream>
 #include <QTableWidget>
@@ -71,6 +72,7 @@ private:
   QLineEdit *ui_default_showname_textbox;
   QFrame *ui_net_divider;
   QLineEdit *ui_ms_textbox;
+  QLineEdit *ui_playerlist_format_edit;
   QCheckBox *ui_discord_cb;
   QLabel *ui_language_label;
   QComboBox *ui_language_combobox;
@@ -134,6 +136,7 @@ private:
   QPushButton *ui_mount_up;
   QPushButton *ui_mount_down;
   QPushButton *ui_mount_clear_cache;
+  QPushButton *ui_mount_open_folder;
 
   // The logging tab
   QCheckBox *ui_downwards_cb;
@@ -161,10 +164,21 @@ private:
   QTextBrowser *ui_privacy_policy;
 
   bool asset_cache_dirty = false;
+  bool m_applyingMountChange = false;
+  QSet<QString> m_pendingPackageRemovals;
 
   bool needsDefaultAudioDevice();
   void populateAudioDevices();
   void updateValues();
+
+  void populateMountList();
+  void saveMountList();
+  void processPendingPackageRemovals();
+  void onMountsChanged();
+  void addMountItem(const QString &entry);
+  QString mountDisplayText(const QString &entry) const;
+  QString mountEntryPath(const QString &entry) const;
+  bool mountEntryIsListed(const QString &entry) const;
 
   QVector<OptionEntry> optionEntries;
 

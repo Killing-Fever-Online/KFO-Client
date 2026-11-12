@@ -17,6 +17,7 @@
 #include <QJsonDocument>
 
 #include <QUiLoader>
+#include <qheaderview.h>
 
 #define FROM_UI(type, name)                                                    \
   ;                                                                            \
@@ -37,10 +38,8 @@ Lobby::Lobby(AOApplication *p_ao_app, NetworkManager *p_net_manager)
   net_manager = p_net_manager;
 
   if (Options::getInstance().autoUpdates()) {
-    // Automatic updates are only supported on Windows, currently.
-#if defined(Q_OS_WIN)
-    ShellExecute(0, 0, TEXT("update.bat"), 0, 0, SW_SHOW);
-#endif
+    // no auto updates for you
+    // TODO: deprecate the option
   }
 
   loadUI();
@@ -207,13 +206,34 @@ void Lobby::loadUI()
   FROM_UI(QLabel, server_player_count_lbl)
   FROM_UI(QTextBrowser, server_description_text)
   FROM_UI(QPushButton, connect_button);
-  connect(ui_connect_button, &QPushButton::released, net_manager,
-          &NetworkManager::join_to_server);
-  connect(ui_connect_button, &QPushButton::released, this, [=] {
-    ui_server_player_count_lbl->setText(tr("Joining Server..."));
+  connect(ui_connect_button, &QPushButton::released, this,
+          &Lobby::on_connect_released);
+  connect(net_manager, &NetworkManager::server_connected, this, [&](bool state) {
+    if (state) {
+      if (join_after_connect) {
+        ui_server_player_count_lbl->setText(tr("Connecting..."));
+        ui_connect_button->setEnabled(false);
+      }
+      else {
+        ui_server_player_count_lbl->setText(tr("Connected!"));
+        ui_connect_button->setEnabled(true);
+      }
+    }
+    else {
+      join_after_connect = false;
+      ui_server_player_count_lbl->setText(tr("Couldn't connect."));
+      ui_connect_button->setEnabled(true);
+    }
   });
-  connect(net_manager, &NetworkManager::server_connected, ui_connect_button,
-          &QPushButton::setEnabled);
+  connect(net_manager, &NetworkManager::server_ready, this, [&] {
+    if (!join_after_connect)
+      return;
+
+    join_after_connect = false;
+    ui_server_player_count_lbl->setText(tr("Joining Server..."));
+    ui_connect_button->setEnabled(false);
+    net_manager->join_to_server();
+  });
 
   FROM_UI(QTextBrowser, motd_text);
   FROM_UI(QTextBrowser, game_changelog_text)
@@ -306,8 +326,16 @@ void Lobby::on_about_clicked()
 {
   const bool hasApng = QImageReader::supportedImageFormats().contains("apng");
   QString msg =
-      tr("<h2>Attorney Online Golden: %1</h2>"
-         // "<h3>A Shred of Moon's Light.</h3>"
+      tr(
+         "<h2>Killing Fever Online: %1</h2>"
+         "<p><b>Source code:</b> "
+         "<a href='https://github.com/Killing-Fever-Online/KFO-Client'>"
+         "https://github.com/Killing-Fever-Online/KFO-Client</a>"
+         "<p><b>Major Development:</b><br>"
+         "Crystalwarrior, SyntaxNyah, EstatoDeviato"
+         "<p><b>Special thanks:</b><br>"
+         "Salanto, OmniTroid, longbyte1 and the Killing Fever Online community"
+         "<p><h3>Attorney Online Golden</h3>"
          "<p><b>Main Development:</b><br>"
          "Satoru;1816 (Lead Developer), SymphonyVR (Rust Server & Design), Sigma | XVIII"
          "<p><b>Special thanks:</b><br>"
@@ -341,7 +369,7 @@ void Lobby::on_about_clicked()
          "server hosts, game masters, case makers, content creators, "
          "and the whole AO2 community!"
          "<p>The Attorney Online networked visual novel project "
-         "is copyright (c) 2016-2022 Attorney Online developers. Open-source "
+         "is copyright (c) 2016-2026 Attorney Online developers. Open-source "
          "licenses apply. All other assets are the property of their "
          "respective owners."
          "<p>Running on Qt version %2 with the BASS audio engine.<br>"
@@ -378,20 +406,64 @@ void Lobby::on_server_list_clicked(QTreeWidgetItem *p_item, int column)
 
   ui_server_description_text->moveCursor(QTextCursor::Start);
   ui_server_description_text->ensureCursorVisible();
-  ui_server_player_count_lbl->setText(tr("Connecting..."));
+  set_player_count(f_server.players, -1);
 
-  ui_connect_button->setEnabled(false);
-
-  net_manager->connect_to_server(f_server);
+  ui_connect_button->setEnabled(true);
 }
 
-// doubleclicked on an item in the serverlist so we'll connect right away
+bool Lobby::connect_to_selected_server()
+{
+  int selection = get_selected_server();
+  if (selection < 0)
+    return false;
+
+  server_type f_server;
+  if (current_page == SERVER) {
+    QVector<server_type> f_server_list = ao_app->get_server_list();
+    if (selection >= f_server_list.size())
+      return false;
+    f_server = f_server_list.at(selection);
+  }
+  else if (current_page == FAVORITES) {
+    QVector<server_type> f_server_list = Options::getInstance().favorites();
+    if (selection >= f_server_list.size())
+      return false;
+    f_server = f_server_list.at(selection);
+  }
+  else {
+    return false;
+  }
+
+  join_after_connect = true;
+  ui_server_player_count_lbl->setText(tr("Connecting..."));
+  ui_connect_button->setEnabled(false);
+  net_manager->connect_to_server(f_server);
+  return true;
+}
+
+void Lobby::on_connect_released()
+{
+  if (current_page == DEMOS) {
+    ui_server_player_count_lbl->setText(tr("Joining Server..."));
+    net_manager->join_to_server();
+    return;
+  }
+
+  connect_to_selected_server();
+}
+
 void Lobby::on_list_doubleclicked(QTreeWidgetItem *p_item, int column)
 {
   Q_UNUSED(p_item)
   Q_UNUSED(column)
-  ui_server_player_count_lbl->setText(tr("Joining Server..."));
-  net_manager->join_to_server();
+
+  if (current_page == DEMOS) {
+    ui_server_player_count_lbl->setText(tr("Joining Server..."));
+    net_manager->join_to_server();
+    return;
+  }
+
+  connect_to_selected_server();
 }
 
 void Lobby::on_favorite_tree_clicked(QTreeWidgetItem *p_item, int column)
@@ -420,11 +492,9 @@ void Lobby::on_favorite_tree_clicked(QTreeWidgetItem *p_item, int column)
   set_server_description(f_server.desc);
   ui_server_description_text->moveCursor(QTextCursor::Start);
   ui_server_description_text->ensureCursorVisible();
-  ui_server_player_count_lbl->setText(tr("Connecting..."));
+  set_player_count(f_server.players, -1);
 
-  ui_connect_button->setEnabled(false);
-
-  net_manager->connect_to_server(f_server);
+  ui_connect_button->setEnabled(true);
 }
 
 void Lobby::on_server_search_edited(QString p_text)
@@ -457,7 +527,7 @@ void Lobby::on_demo_clicked(QTreeWidgetItem *item, int column)
     return;
   }
 
-  QString l_filepath = (QApplication::applicationDirPath() + "/logs/%1/%2")
+  QString l_filepath = (get_app_dir_path() + "/logs/%1/%2")
                            .arg(item->data(0, Qt::DisplayRole).toString(),
                                 item->data(1, Qt::DisplayRole).toString());
   ao_app->demo_server->start_server();
@@ -497,11 +567,18 @@ void Lobby::list_servers()
     QTreeWidgetItem *treeItem = new QTreeWidgetItem(ui_serverlist_tree);
     treeItem->setData(0, Qt::DisplayRole, i);
     treeItem->setText(1, i_server.name);
+    treeItem->setData(2, Qt::DisplayRole, i_server.players);
     i++;
   }
   ui_serverlist_tree->setSortingEnabled(true);
-  ui_serverlist_tree->sortItems(0, Qt::SortOrder::AscendingOrder);
-  ui_serverlist_tree->resizeColumnToContents(0);
+  // sort by player count
+  ui_serverlist_tree->sortItems(2, Qt::SortOrder::DescendingOrder);
+  // hide the arbitrary number column
+  ui_serverlist_tree->hideColumn(0);
+  // Name stretches to fill
+  ui_serverlist_tree->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+  ui_serverlist_tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+  ui_serverlist_tree->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
 }
 
 void Lobby::list_favorites()
@@ -541,11 +618,20 @@ void Lobby::list_demos()
 
 void Lobby::get_motd()
 {
-  net_manager->request_document(MSDocumentType::Motd, [this](QString document) {
-    if (document.isEmpty()) {
-      document = tr("Couldn't get the message of the day.");
+  // Create a weak QPointer of lobby because otherwise if we join a server too fast
+  // before the motd loads we'll just segfault trying to show it.
+  QPointer<Lobby> lobby(this);
+
+  net_manager->request_document(MSDocumentType::Motd, [lobby](QString document) {
+    // If the lobby was destructed while the request was pending,
+    // lobby will automatically evaluate to nullptr.
+    if (!lobby) {
+      return;
     }
-    ui_motd_text->setHtml(document);
+    if (document.isEmpty()) {
+      document = lobby->tr("Couldn't get the message of the day.");
+    }
+    lobby->ui_motd_text->setHtml(document);
   });
 }
 
@@ -638,6 +724,17 @@ void Lobby::check_for_updates()
 
 void Lobby::set_player_count(int players_online, int max_players)
 {
+  if (max_players < 0) {
+    if (players_online < 0) {
+      ui_server_player_count_lbl->setText(tr("Server"));
+    }
+    else {
+      ui_server_player_count_lbl->setText(
+          tr("Online: %1").arg(QString::number(players_online)));
+    }
+    return;
+  }
+
   QString f_string =
       tr("Online: %1/%2")
           .arg(QString::number(players_online), QString::number(max_players));

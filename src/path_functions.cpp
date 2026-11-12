@@ -1,6 +1,7 @@
 #include "aoapplication.h"
 #include "courtroom.h"
 #include "file_functions.h"
+#include "mount_manager.h"
 #include "options.h"
 #include "webcache.h"
 
@@ -428,7 +429,7 @@ QString AOApplication::get_real_path(const VPath &vpath,
   }
 
   // Cache miss; try all known mount paths
-  QStringList bases = Options::getInstance().mountPaths();
+  QStringList bases = m_mounts->resolvedMountPaths();
   bases.prepend(get_base_path());
   // base
   // content 1
@@ -484,6 +485,7 @@ void AOApplication::invalidate_lookup_cache() {
   asset_lookup_cache.clear();
   dir_listing_cache.clear();
   dir_listing_exist_cache.clear();
+  ini_cache.clear();
 }
 
 // Lowercase path components (for local storage)
