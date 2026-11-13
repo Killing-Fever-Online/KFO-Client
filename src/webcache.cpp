@@ -7,15 +7,22 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
 #include <QNetworkRequest>
+#include <QTimer>
 #include <QUrl>
 
 WebCache::WebCache(AOApplication *parent)
     : QObject(parent)
     , ao_app(parent)
     , m_network_manager(new QNetworkAccessManager(this))
+    , m_extensions_manager(new QNetworkAccessManager(this))
 {
   connect(m_network_manager, &QNetworkAccessManager::finished, this, &WebCache::onDownloadFinished);
+  resetDefaultExtensions();
 }
 
 WebCache::~WebCache()
@@ -52,9 +59,208 @@ QString WebCache::cacheSubdir() const
   return subdir;
 }
 
-QString WebCache::getCachedPath(const QString &relativePath, const QStringList &suffixes) const
+void WebCache::resetDefaultExtensions()
+{
+  m_extensions = {
+      {"charicon_extensions", {".png", ".webp"}},
+      {"emote_extensions", {".gif", ".png", ".apng", ".webp", ".webp.static"}},
+      {"emotions_extensions", {".png", ".webp"}},
+      {"background_extensions", {".png", ".gif", ".webp", ".apng"}},
+      {"sfx_extensions", {".opus", ".ogg", ".mp3", ".wav"}},
+      {"blip_extensions", {".opus", ".ogg", ".mp3", ".wav"}},
+      {"music_extensions", {".opus", ".ogg", ".mp3", ".wav"}},
+  };
+}
+
+QString WebCache::normalizeRelativePath(const QString &relativePath) const
 {
   if (relativePath.isEmpty())
+  {
+    return QString();
+  }
+
+  // Reject absolute paths and URLs outright.
+  if (relativePath.startsWith('/') || relativePath.contains("://") || relativePath.contains(":/"))
+  {
+    return QString();
+  }
+
+  QString cleaned = QDir::cleanPath(relativePath);
+  cleaned.replace('\\', '/');
+
+  // Reject paths that escape the cache root after normalization.
+  if (cleaned.isEmpty() || cleaned == "." || cleaned == ".." || cleaned.startsWith("../"))
+  {
+    return QString();
+  }
+
+  return ao_app->lowercasePath(cleaned);
+}
+
+QStringList WebCache::extensions(const QString &category) const
+{
+  return m_extensions.value(category);
+}
+
+bool WebCache::hasServerExtensions() const
+{
+  return m_extensions_loaded;
+}
+
+bool WebCache::hasPendingExtensionsFetch() const
+{
+  return m_extensions_fetching;
+}
+
+bool WebCache::fetchExtensions()
+{
+  if (!Options::getInstance().webcacheEnabled())
+  {
+    return false;
+  }
+
+  QString assetUrl = ao_app->asset_url;
+  if (assetUrl.isEmpty())
+  {
+    return false;
+  }
+
+  if (!assetUrl.endsWith('/'))
+  {
+    assetUrl += '/';
+  }
+
+  QUrl url(assetUrl + "extensions.json");
+  if (!url.isValid())
+  {
+    return false;
+  }
+
+  // Don't re-fetch the same file repeatedly if the server sends ASS again.
+  if (m_extensions_url == url.toString())
+  {
+    return false;
+  }
+  m_extensions_url = url.toString();
+  // Start from built-in defaults so a partial or failed fetch from a new
+  // server never inherits the previous server's advertised lists. A path that
+  // failed on the previous server may well exist on the new one.
+  m_extensions_loaded = false;
+  m_extensions_fetching = true;
+  resetDefaultExtensions();
+  m_failed_downloads.clear();
+
+  QNetworkRequest request{url};
+  request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+
+  qDebug() << "WebCache: Fetching extensions from" << url.toString();
+  QNetworkReply *reply = m_extensions_manager->get(request);
+  connect(reply, &QNetworkReply::finished, this, [this, reply] {
+    onExtensionsFinished(reply);
+  });
+
+  // Never stall the client indefinitely on a broken asset host.
+  QTimer::singleShot(5000, reply, [reply] {
+    if (reply->isRunning())
+    {
+      qWarning() << "WebCache: extensions.json request timed out";
+      reply->abort();
+    }
+  });
+
+  return true;
+}
+
+void WebCache::onExtensionsFinished(QNetworkReply *reply)
+{
+  if (reply->error() != QNetworkReply::NoError)
+  {
+    qDebug() << "WebCache: Failed to fetch extensions.json -" << reply->errorString();
+    m_extensions_fetching = false;
+    emit extensionsFailed();
+    reply->deleteLater();
+    return;
+  }
+
+  int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+  if (statusCode != 200)
+  {
+    qDebug() << "WebCache: extensions.json returned status" << statusCode;
+    m_extensions_fetching = false;
+    emit extensionsFailed();
+    reply->deleteLater();
+    return;
+  }
+
+  QJsonParseError parse_error;
+  QJsonDocument document = QJsonDocument::fromJson(reply->readAll(), &parse_error);
+  if (parse_error.error != QJsonParseError::NoError || !document.isObject())
+  {
+    qWarning() << "WebCache: Invalid extensions.json:" << parse_error.errorString();
+    m_extensions_fetching = false;
+    emit extensionsFailed();
+    reply->deleteLater();
+    return;
+  }
+
+  // The server's manifest is authoritative: categories it doesn't advertise
+  // must not silently fall back to the built-in extension guesses.
+  m_extensions.clear();
+
+  const QJsonObject root = document.object();
+  for (auto it = root.begin(); it != root.end(); ++it)
+  {
+    if (!it.value().isArray())
+    {
+      continue;
+    }
+
+    QStringList extension_list;
+    const QJsonArray array = it.value().toArray();
+    for (const QJsonValue &value : array)
+    {
+      if (!value.isString())
+      {
+        continue;
+      }
+
+      QString extension = value.toString().trimmed().toLower();
+      if (extension.isEmpty() || !extension.startsWith('.'))
+      {
+        continue;
+      }
+      extension_list.append(extension);
+    }
+
+    if (!extension_list.isEmpty())
+    {
+      m_extensions.insert(it.key(), extension_list);
+    }
+  }
+
+  m_extensions_loaded = true;
+  m_extensions_fetching = false;
+  qDebug() << "WebCache: Loaded extensions.json with" << m_extensions.size() << "categories";
+  emit extensionsLoaded();
+  reply->deleteLater();
+}
+
+QString WebCache::resolveOrDownload(const QString &relativePath, const QStringList &suffixes)
+{
+  const QString lowerPath = resolve(relativePath, suffixes);
+  if (lowerPath.isEmpty())
+  {
+    return QString();
+  }
+
+  download(lowerPath);
+  return lowerPath;
+}
+
+QString WebCache::getCachedPath(const QString &relativePath, const QStringList &suffixes) const
+{
+  QString lowerPath = normalizeRelativePath(relativePath);
+  if (lowerPath.isEmpty())
   {
     return QString();
   }
@@ -70,8 +276,7 @@ QString WebCache::getCachedPath(const QString &relativePath, const QStringList &
   for (const QString &suffix : effectiveSuffixes)
   {
     // Use lowercase path for cache lookup (no percent-encoding in local paths)
-    QString lowerPath = ao_app->lowercasePath(relativePath + suffix);
-    QString localPath = cacheDir() + subdir + lowerPath;
+    QString localPath = cacheDir() + subdir + lowerPath + suffix;
 
     if (!file_exists(localPath))
     {
@@ -110,17 +315,6 @@ bool WebCache::isExpired(const QString &localPath) const
 
 QString WebCache::resolve(const QString &relativePath, const QStringList &suffixes)
 {
-  if (relativePath.isEmpty())
-  {
-    return "";
-  }
-
-  // Reject paths containing absolute paths (they shouldn't be passed to webcache)
-  if (relativePath.startsWith('/') || relativePath.contains("//") || relativePath.contains(":/"))
-  {
-    return "";
-  }
-
   // Check if webcache is enabled
   if (!Options::getInstance().webcacheEnabled())
   {
@@ -130,6 +324,12 @@ QString WebCache::resolve(const QString &relativePath, const QStringList &suffix
   // Check if server has an asset URL
   QString assetUrl = ao_app->asset_url;
   if (assetUrl.isEmpty())
+  {
+    return "";
+  }
+
+  const QString lowerBasePath = normalizeRelativePath(relativePath);
+  if (lowerBasePath.isEmpty())
   {
     return "";
   }
@@ -149,12 +349,28 @@ QString WebCache::resolve(const QString &relativePath, const QStringList &suffix
 
   // Try each suffix (like webAO tries multiple extensions)
   QStringList effectiveSuffixes = suffixes.isEmpty() ? QStringList{""} : suffixes;
+
+  // If the path already has a file extension, try the exact path first.
+  const int lastSlash = lowerBasePath.lastIndexOf('/');
+  if (lowerBasePath.lastIndexOf('.') > lastSlash && !effectiveSuffixes.contains(""))
+  {
+    effectiveSuffixes.prepend("");
+  }
+
   for (const QString &suffix : effectiveSuffixes)
   {
-    QString fullPath = relativePath + suffix;
+    // .webp.static is a webAO marker for an unprefixed .webp file, not a
+    // literal suffix. Callers that need it handle it explicitly.
+    if (suffix == ".webp.static")
+    {
+      continue;
+    }
 
-    // Lowercase path for local storage and tracking (no percent-encoding)
-    QString lowerPath = ao_app->lowercasePath(fullPath);
+    QString lowerPath = normalizeRelativePath(lowerBasePath + suffix);
+    if (lowerPath.isEmpty())
+    {
+      continue;
+    }
 
     // Check if already downloading this path
     if (m_pending_downloads.contains(lowerPath))
@@ -205,8 +421,12 @@ void WebCache::download(const QString &relativePath)
     return;
   }
 
-  // Lowercase path for local storage and tracking (no percent-encoding)
-  QString lowerPath = ao_app->lowercasePath(relativePath);
+  // Lowercase and normalize the path for local storage and tracking
+  QString lowerPath = normalizeRelativePath(relativePath);
+  if (lowerPath.isEmpty())
+  {
+    return;
+  }
 
   // Check if already downloading this path
   if (m_pending_downloads.contains(lowerPath))
@@ -227,7 +447,7 @@ void WebCache::download(const QString &relativePath)
   QString remoteUrl = assetUrl + ao_app->urlEncodePath(lowerPath);
 
   // Begin the download
-  startDownload(remoteUrl, localPath, relativePath);
+  startDownload(remoteUrl, localPath, lowerPath);
 }
 
 void WebCache::startDownload(const QString &remoteUrl, const QString &localPath, const QString &relativePath)
@@ -255,9 +475,10 @@ void WebCache::onDownloadFinished(QNetworkReply *reply)
   if (reply->error() != QNetworkReply::NoError)
   {
     qDebug() << "WebCache: Download failed for" << reply->url().toString(QUrl::EncodeSpaces) << "-" << reply->errorString();
-    // Notify listeners that a file has failed to be downloaded
-    emit downloadFailed(relativePath);
+    // Record the failure before notifying listeners so a listener can
+    // immediately retry with the next advertised extension.
     m_failed_downloads.insert(relativePath);
+    emit downloadFailed(relativePath);
     reply->deleteLater();
     return;
   }
@@ -267,9 +488,10 @@ void WebCache::onDownloadFinished(QNetworkReply *reply)
   if (statusCode != 200)
   {
     qDebug() << "WebCache: Download returned status" << statusCode << "for" << reply->url().toString(QUrl::EncodeSpaces);
-    // Notify listeners that a file has failed to be downloaded
-    emit downloadFailed(relativePath);
+    // Record the failure before notifying listeners so a listener can
+    // immediately retry with the next advertised extension.
     m_failed_downloads.insert(relativePath);
+    emit downloadFailed(relativePath);
     reply->deleteLater();
     return;
   }
@@ -282,7 +504,9 @@ void WebCache::onDownloadFinished(QNetworkReply *reply)
     if (!dir.mkpath("."))
     {
       qWarning() << "WebCache: Failed to create directory" << dir.absolutePath();
-      // Notify listeners that a file has failed to be downloaded
+      // Record the failure before notifying listeners so a listener can
+      // immediately retry with the next advertised extension.
+      m_failed_downloads.insert(relativePath);
       emit downloadFailed(relativePath);
       reply->deleteLater();
       return;
@@ -294,7 +518,9 @@ void WebCache::onDownloadFinished(QNetworkReply *reply)
   if (!file.open(QIODevice::WriteOnly))
   {
     qWarning() << "WebCache: Failed to open file for writing:" << localPath;
-    // Notify listeners that a file has failed to be downloaded
+    // Record the failure before notifying listeners so a listener can
+    // immediately retry with the next advertised extension.
+    m_failed_downloads.insert(relativePath);
     emit downloadFailed(relativePath);
     reply->deleteLater();
     return;
@@ -325,6 +551,8 @@ void WebCache::clearCache()
       qDebug() << "WebCache: Cache cleared";
     }
   }
+  // Allow previously failed paths to be attempted again.
+  m_failed_downloads.clear();
 }
 
 qint64 WebCache::getCacheSize() const

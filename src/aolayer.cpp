@@ -9,6 +9,24 @@
 
 static QThreadPool *thread_pool;
 
+static QStringList webcache_image_extensions(AOApplication *ao_app, const QString &category)
+{
+  QStringList extensions = ao_app->assetExtensions(
+      category, {".webp", ".apng", ".gif", ".png"});
+
+  // .webp.static is a marker for an unprefixed .webp file, not a literal
+  // extension, so translate it before probing.
+  for (QString &extension : extensions)
+  {
+    if (extension == ".webp.static")
+    {
+      extension = ".webp";
+    }
+  }
+  extensions.removeDuplicates();
+  return extensions;
+}
+
 AOLayer::AOLayer(QWidget *p_parent, AOApplication *p_ao_app) : QLabel(p_parent)
 {
   ao_app = p_ao_app;
@@ -50,6 +68,8 @@ EffectLayer::EffectLayer(QWidget *p_parent, AOApplication *p_ao_app)
 SplashLayer::SplashLayer(QWidget *p_parent, AOApplication *p_ao_app)
     : AOLayer(p_parent, p_ao_app)
 {
+  connect(ao_app->webcache(), &WebCache::fileDownloaded, this, &SplashLayer::on_webcache_file_downloaded);
+  connect(ao_app->webcache(), &WebCache::downloadFailed, this, &SplashLayer::on_webcache_download_failed);
 }
 InterfaceLayer::InterfaceLayer(QWidget *p_parent, AOApplication *p_ao_app)
     : AOLayer(p_parent, p_ao_app)
@@ -58,6 +78,8 @@ InterfaceLayer::InterfaceLayer(QWidget *p_parent, AOApplication *p_ao_app)
 StickerLayer::StickerLayer(QWidget *p_parent, AOApplication *p_ao_app)
     : AOLayer(p_parent, p_ao_app)
 {
+  connect(ao_app->webcache(), &WebCache::fileDownloaded, this, &StickerLayer::on_webcache_file_downloaded);
+  connect(ao_app->webcache(), &WebCache::downloadFailed, this, &StickerLayer::on_webcache_download_failed);
 }
 
 QString AOLayer::find_image(QStringList p_list)
@@ -152,11 +174,16 @@ bool BackgroundLayer::download_image(QString p_filename)
   QString file_path = ao_app->get_image_suffix(vpath);
   if (file_path.isEmpty() && Options::getInstance().webcacheEnabled())
   {
-    QString lowerPath = ao_app->webcache()->resolve(vpath.toQString(), {".webp", ".apng", ".gif", ".png"});
-    if (!lowerPath.isEmpty())
+    const QStringList extensions = ao_app->assetExtensions(
+        "background_extensions", {".webp", ".apng", ".gif", ".png"});
+    if (!extensions.isEmpty())
     {
-      ao_app->webcache()->download(lowerPath);
-      return true;
+      QString lowerPath = ao_app->webcache()->resolve(vpath.toQString(), extensions);
+      if (!lowerPath.isEmpty())
+      {
+        ao_app->webcache()->download(lowerPath);
+        return true;
+      }
     }
   }
   return false;
@@ -200,19 +227,37 @@ bool CharLayer::download_image(QString p_filename, QString p_charname, bool p_is
   // Trigger webcache download if actual character emote not found (fell back to placeholder or not found)
   if ((resolved.isEmpty() || resolved.contains("/placeholder")) && Options::getInstance().webcacheEnabled())
   {
-    static const QStringList image_suffixes{".webp", ".apng", ".gif", ".png"};
-    // Try downloading the character-specific paths (first 4 entries, before placeholder fallbacks)
-    for (int i = 0; i < 4 && i < pathlist.size(); ++i)
+    QStringList image_suffixes = ao_app->assetExtensions(
+        "emote_extensions", {".webp", ".apng", ".gif", ".png"});
+    // .webp.static is a marker for an unprefixed .webp file, not a literal
+    // extension. WebCache skips it, so translate it here and let the pathlist
+    // below include the unprefixed candidate.
+    for (QString &suffix : image_suffixes)
     {
-      QString path = pathlist[i].toQString();
-      if (!path.isEmpty())
+      if (suffix == ".webp.static")
       {
-        QString lowerPath = ao_app->webcache()->resolve(path, image_suffixes);
-        if (!lowerPath.isEmpty())
+        suffix = ".webp";
+      }
+    }
+    image_suffixes.removeDuplicates();
+
+    // Try downloading the character-specific paths (first 4 entries, before
+    // placeholder fallbacks). An empty list means the server didn't advertise
+    // emote extensions, so don't guess.
+    if (!image_suffixes.isEmpty())
+    {
+      for (int i = 0; i < 4 && i < pathlist.size(); ++i)
+      {
+        QString path = pathlist[i].toQString();
+        if (!path.isEmpty())
         {
-          qDebug() << "Resolving " << path << " for " << p_filename << " , " << p_charname << " , preanim: " << p_is_preanim;
-          dl_count += 1;
-          ao_app->webcache()->download(lowerPath);
+          QString lowerPath = ao_app->webcache()->resolve(path, image_suffixes);
+          if (!lowerPath.isEmpty())
+          {
+            qDebug() << "Resolving " << path << " for " << p_filename << " , " << p_charname << " , preanim: " << p_is_preanim;
+            dl_count += 1;
+            ao_app->webcache()->download(lowerPath);
+          }
         }
       }
     }
@@ -276,13 +321,99 @@ void CharLayer::load_image(QString p_filename, QString p_charname,
   play();
 }
 
+bool SplashLayer::download_image(QString p_filename, QString p_charname,
+                                 QString p_miscname, bool p_reload_on_finish)
+{
+  QString final_image = ao_app->get_image(p_filename,
+      Options::getInstance().theme(), Options::getInstance().subTheme(),
+      ao_app->default_theme, p_miscname, p_charname, "placeholder");
+
+  // Trigger a webcache download if the requested splash image is missing or
+  // only resolved to a placeholder.
+  if ((final_image.isEmpty() || final_image.contains("/placeholder")) &&
+      Options::getInstance().webcacheEnabled())
+  {
+    m_pending_filename = p_filename;
+    m_pending_charname = p_charname;
+    m_pending_miscname = p_miscname;
+    m_reload_on_finish = p_reload_on_finish;
+
+    QVector<VPath> pathlist = ao_app->get_asset_paths(p_filename,
+        Options::getInstance().theme(), Options::getInstance().subTheme(),
+        ao_app->default_theme, p_miscname, p_charname, "placeholder");
+    const QStringList extensions = webcache_image_extensions(ao_app, "emote_extensions");
+
+    // An empty list means the server manifest didn't advertise emote
+    // extensions, so don't guess and spam the server.
+    if (!extensions.isEmpty())
+    {
+      for (const VPath &path : pathlist)
+      {
+        if (path.toQString().contains("placeholder"))
+        {
+          continue;
+        }
+
+        QString lowerPath = ao_app->webcache()->resolve(path.toQString(), extensions);
+        if (!lowerPath.isEmpty())
+        {
+          qDebug() << "WebCache: starting download of splash image" << lowerPath;
+          m_pending_path = lowerPath;
+          ao_app->webcache()->download(lowerPath);
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 void SplashLayer::load_image(QString p_filename, QString p_charname,
                                    QString p_miscname)
 {
   transform_mode = ao_app->get_misc_scaling(p_miscname);
+
+  if (download_image(p_filename, p_charname, p_miscname))
+  {
+    return;
+  }
+
   QString final_image = ao_app->get_image(p_filename, Options::getInstance().theme(), Options::getInstance().subTheme(), ao_app->default_theme, p_miscname, p_charname, "placeholder");
   start_playback(final_image);
   play();
+}
+
+void SplashLayer::on_webcache_file_downloaded(const QString &relativePath)
+{
+  if (relativePath != m_pending_path || m_pending_path.isEmpty())
+  {
+    return;
+  }
+  m_pending_path.clear();
+  if (!m_reload_on_finish)
+  {
+    return;
+  }
+  load_image(m_pending_filename, m_pending_charname, m_pending_miscname);
+}
+
+void SplashLayer::on_webcache_download_failed(const QString &relativePath)
+{
+  if (relativePath != m_pending_path || m_pending_path.isEmpty())
+  {
+    return;
+  }
+  m_pending_path.clear();
+  // Try the next candidate/extension even when prefetching, but only show the
+  // image if this layer is the one that requested it.
+  const bool retrying = download_image(m_pending_filename, m_pending_charname,
+                                       m_pending_miscname, m_reload_on_finish);
+  if (!retrying && m_reload_on_finish)
+  {
+    // Every candidate failed; fall back to whatever get_image() resolves to.
+    load_image(m_pending_filename, m_pending_charname, m_pending_miscname);
+  }
 }
 
 void EffectLayer::load_image(QString p_filename, bool p_looping)
@@ -315,8 +446,62 @@ void StickerLayer::load_image(QString p_charname)
     p_miscname = ao_app->get_chat(p_charname);
   transform_mode = ao_app->get_misc_scaling(p_miscname);
   QString final_image = ao_app->get_image("sticker/" + p_charname, Options::getInstance().theme(), Options::getInstance().subTheme(), ao_app->default_theme, p_miscname);
+
+  if ((final_image.isEmpty() || final_image.contains("/placeholder")) &&
+      Options::getInstance().webcacheEnabled())
+  {
+    m_pending_charname = p_charname;
+
+    QVector<VPath> pathlist = ao_app->get_asset_paths("sticker/" + p_charname,
+        Options::getInstance().theme(), Options::getInstance().subTheme(),
+        ao_app->default_theme, p_miscname, "", "placeholder");
+    const QStringList extensions = webcache_image_extensions(ao_app, "emote_extensions");
+
+    // An empty list means the server manifest didn't advertise emote
+    // extensions, so don't guess and spam the server.
+    if (!extensions.isEmpty())
+    {
+      for (const VPath &path : pathlist)
+      {
+        if (path.toQString().contains("placeholder"))
+        {
+          continue;
+        }
+
+        QString lowerPath = ao_app->webcache()->resolve(path.toQString(), extensions);
+        if (!lowerPath.isEmpty())
+        {
+          qDebug() << "WebCache: starting download of sticker image" << lowerPath;
+          m_pending_path = lowerPath;
+          ao_app->webcache()->download(lowerPath);
+          return;
+        }
+      }
+    }
+  }
+
   start_playback(final_image);
   play();
+}
+
+void StickerLayer::on_webcache_file_downloaded(const QString &relativePath)
+{
+  if (relativePath != m_pending_path || m_pending_path.isEmpty())
+  {
+    return;
+  }
+  m_pending_path.clear();
+  load_image(m_pending_charname);
+}
+
+void StickerLayer::on_webcache_download_failed(const QString &relativePath)
+{
+  if (relativePath != m_pending_path || m_pending_path.isEmpty())
+  {
+    return;
+  }
+  m_pending_path.clear();
+  load_image(m_pending_charname);
 }
 
 void CharLayer::start_playback(QString p_image)

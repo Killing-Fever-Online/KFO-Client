@@ -73,13 +73,16 @@ void AOEmoteButton::set_char_image(QString p_char, int p_emote, bool on)
   // WebCache DL the emote button (for simplicity's sake it only DLs the _off button
   if (Options::getInstance().webcacheEnabled() && !file_exists(image)) {
     QString image_path = ao_app->get_character_path(p_char, "emotions/button" + emotion_number + suffixes[0]).toQString();
-    QString lowerPath = ao_app->webcache()->resolve(image_path, {".png"});
-    qDebug() << "WebCache: resolving emote button of " << image_path;
-    if (!lowerPath.isEmpty()) {
-      qDebug() << "WebCache: starting download of emote button" << lowerPath;
-      download_path = lowerPath;
-      ao_app->webcache()->download(lowerPath);
-      return;
+    const QStringList extensions = ao_app->assetExtensions("emotions_extensions", {".png", ".webp"});
+    if (!extensions.isEmpty()) {
+      QString lowerPath = ao_app->webcache()->resolve(image_path, extensions);
+      qDebug() << "WebCache: resolving emote button of " << image_path;
+      if (!lowerPath.isEmpty()) {
+        qDebug() << "WebCache: starting download of emote button" << lowerPath;
+        download_path = lowerPath;
+        ao_app->webcache()->download(lowerPath);
+        return;
+      }
     }
   }
   set_image(image, emote_comment);

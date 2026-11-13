@@ -275,6 +275,10 @@ public:
   // Returns true if this message has an objection, otherwise returns false. The result decides when to call handle_ic_message()
   bool handle_objection();
 
+  // Resolves the bubble filename and sound name for the given objection
+  // modifier (e.g. "1", "2", "4&custom.png"). Empty strings mean no objection.
+  void get_objection_assets(const QString &p_objection_mod, QString &p_filename, QString &p_sfx);
+
   // Display the evidence image box when presenting evidence in IC
   void display_evidence_image();
 
@@ -326,7 +330,8 @@ public:
   // filesystem) takes in a list where the first element is the song name and
   // the second is the char id of who played it
   void handle_song(QStringList *p_contents);
-
+  void play_song(QString f_song, int n_char, QString showname_override,
+                 bool looping, int channel, int effect_flags);
   void play_preanim(bool immediate);
 
   // plays the witness testimony or cross examination animation based on
@@ -749,6 +754,18 @@ private:
   QAction* action_disable_url_sharing;
 
   AOMusicPlayer *music_player;
+
+  struct PendingSong
+  {
+    QString song;
+    int char_id = 0;
+    QString showname_override;
+    bool looping = false;
+    int channel = 0;
+    int effect_flags = 0;
+  };
+  QMap<QString, PendingSong> m_pending_songs;
+
   AOSfxPlayer *sfx_player;
   AOSfxPlayer *objection_player;
   AOBlipPlayer *blip_player;

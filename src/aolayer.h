@@ -249,7 +249,23 @@ class SplashLayer : public AOLayer {
   Q_OBJECT
 public:
   SplashLayer(QWidget *p_parent, AOApplication *p_ao_app);
+  // returns true if a webcache download was started. Set p_reload_on_finish to
+  // false when prefetching, so the image isn't played before the message that
+  // requested it is unpacked.
+  bool download_image(QString p_filename, QString p_charname, QString p_miscname,
+                      bool p_reload_on_finish = true);
   void load_image(QString p_filename, QString p_charname, QString p_miscname);
+
+private:
+  QString m_pending_filename;
+  QString m_pending_charname;
+  QString m_pending_miscname;
+  QString m_pending_path;
+  bool m_reload_on_finish = true;
+
+private slots:
+  void on_webcache_file_downloaded(const QString &relativePath);
+  void on_webcache_download_failed(const QString &relativePath);
 };
 
 class EffectLayer : public AOLayer {
@@ -271,6 +287,14 @@ class StickerLayer : public AOLayer {
 public:
   StickerLayer(QWidget *p_parent, AOApplication *p_ao_app);
   void load_image(QString p_charname);
+
+private:
+  QString m_pending_charname;
+  QString m_pending_path;
+
+private slots:
+  void on_webcache_file_downloaded(const QString &relativePath);
+  void on_webcache_download_failed(const QString &relativePath);
 };
 
 #endif // AOLAYER_H

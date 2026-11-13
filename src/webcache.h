@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 class AOApplication;
@@ -33,6 +34,16 @@ signals:
    * @param relativePath The lowercase relative path of the cached file (e.g., "characters/phoenix/char_icon.png")
    */
   void downloadFailed(const QString &relativePath);
+
+  /**
+   * @brief Emitted when extensions.json has been fetched and parsed.
+   */
+  void extensionsLoaded();
+
+  /**
+   * @brief Emitted when extensions.json could not be fetched or parsed.
+   */
+  void extensionsFailed();
 
 
 public:
@@ -94,18 +105,71 @@ public:
    * E.g., "https://direct.grave.wine/base/" -> "direct.grave.wine/base/"
    */
   QString cacheSubdir() const;
+
+  /**
+   * @brief Fetch and parse extensions.json from the current asset URL.
+   * @return True if a new request was started, false if no fetch is needed.
+   */
+  bool fetchExtensions();
+
+  /**
+   * @brief Whether an extensions.json request is currently in flight.
+   * While true, remote extension probing is blocked so the manifest is
+   * never bypassed by the built-in fallbacks.
+   */
+  bool hasPendingExtensionsFetch() const;
+
+  /**
+   * @brief Returns the advertised extension list for an asset category.
+   * @param category The JSON key, e.g. "emote_extensions"
+   * @return The extension list, or an empty list for an unknown category.
+   */
+  QStringList extensions(const QString &category) const;
+
+  /**
+   * @brief Whether a valid extensions.json was loaded from the server.
+   * When true, its lists are authoritative and built-in fallbacks must not
+   * be used for remote probing.
+   */
+  bool hasServerExtensions() const;
+
+  /**
+   * @brief Resolves a relative path and starts the download if necessary.
+   * @return The normalized relative path of the started download, or an
+   *         empty string if nothing needed to be downloaded.
+   */
+  QString resolveOrDownload(const QString &relativePath, const QStringList &suffixes = {""});
+
 private slots:
   void onDownloadFinished(QNetworkReply *reply);
+  void onExtensionsFinished(QNetworkReply *reply);
 
 private:
   AOApplication *ao_app;
   QNetworkAccessManager *m_network_manager;
+  QNetworkAccessManager *m_extensions_manager;
+
+  QHash<QString, QStringList> m_extensions;
+  QString m_extensions_url;
+  bool m_extensions_loaded = false;
+  bool m_extensions_fetching = false;
 
   // Track pending downloads to avoid duplicate requests
   QHash<QString, bool> m_pending_downloads;
 
   // Track failed downloads to avoid retrying them repeatedly
   QSet<QString> m_failed_downloads;
+
+  /**
+   * @brief Lowercases and cleans a relative path for cache lookup/storage.
+   * @return The normalized path, or an empty string if it is invalid.
+   */
+  QString normalizeRelativePath(const QString &relativePath) const;
+
+  /**
+   * @brief Resets the extension lists to the built-in fallbacks.
+   */
+  void resetDefaultExtensions();
 
   /**
    * @brief Calculates directory size recursively.

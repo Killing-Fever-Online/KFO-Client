@@ -2697,6 +2697,27 @@ void Courtroom::chatmessage_dequeue()
     // download their char ini
     dl_count += download_char_ini(pending_chatmessage[CHAR_NAME]);
 
+    // download the message's sound effect
+    // This mirrors play_sfx(), which doesn't pass a character or misc name.
+    const QString message_sfx = pending_chatmessage[SFX_NAME];
+    if (!message_sfx.isEmpty() && message_sfx != "1")
+    {
+      dl_count += !ao_app->download_sfx(message_sfx).isEmpty();
+    }
+
+    // download the shout bubble and objection sound
+    QString objection_filename;
+    QString objection_sfx;
+    get_objection_assets(pending_chatmessage[OBJECTION_MOD], objection_filename, objection_sfx);
+    if (!objection_filename.isEmpty())
+    {
+      dl_count += !ao_app->download_sfx(objection_sfx, ao_app->get_chat(pending_chatmessage[CHAR_NAME]), pending_chatmessage[CHAR_NAME]).isEmpty();
+      dl_count += ui_vp_objection->download_image(objection_filename, pending_chatmessage[CHAR_NAME], ao_app->get_chat(pending_chatmessage[CHAR_NAME]), false);
+    }
+
+    // download the character's blips
+    dl_count += !ao_app->download_blips(pending_chatmessage[CHAR_NAME]).isEmpty();
+
     // download the main player
     dl_count += ui_vp_player_char->download_image(pending_chatmessage[PRE_EMOTE], pending_chatmessage[CHAR_NAME], true);
     dl_count += ui_vp_player_char->download_image("(b)" + pending_chatmessage[EMOTE], pending_chatmessage[CHAR_NAME], false);
@@ -2916,58 +2937,61 @@ void Courtroom::log_chatmessage(QString f_message, int f_char_id, QString f_show
   }
 }
 
-bool Courtroom::handle_objection()
+void Courtroom::get_objection_assets(const QString &p_objection_mod, QString &p_filename, QString &p_sfx)
 {
-  // Check if a custom objection is in use
+  p_filename.clear();
+  p_sfx.clear();
+
   int objection_mod = 0;
   QString custom_objection = "";
-  if (m_chatmessage[OBJECTION_MOD].contains("4&")) {
+  if (p_objection_mod.contains("4&")) {
     objection_mod = 4;
-    custom_objection = m_chatmessage[OBJECTION_MOD].split(
-        "4&")[1]; // takes the name of custom objection.
+    custom_objection = p_objection_mod.split("4&")[1];
   }
   else {
-    objection_mod = m_chatmessage[OBJECTION_MOD].toInt();
+    objection_mod = p_objection_mod.toInt();
   }
 
+  switch (objection_mod) {
+  case 1:
+    p_filename = "holdit_bubble";
+    p_sfx = "holdit";
+    break;
+  case 2:
+    p_filename = "objection_bubble";
+    p_sfx = "objection";
+    break;
+  case 3:
+    p_filename = "takethat_bubble";
+    p_sfx = "takethat";
+    break;
+  case 4:
+    if (custom_objection != "") {
+      p_filename = "custom_objections/" + custom_objection.left(custom_objection.lastIndexOf("."));
+      p_sfx = p_filename;
+    }
+    else {
+      p_filename = "custom";
+      p_sfx = "custom";
+    }
+    break;
+  default:
+    break;
+  }
+}
+
+bool Courtroom::handle_objection()
+{
+  QString filename;
+  QString sfx_name;
+  get_objection_assets(m_chatmessage[OBJECTION_MOD], filename, sfx_name);
+
   // if an objection is used
-  if (objection_mod <= 4 && objection_mod >= 1) {
+  if (!filename.isEmpty()) {
     ui_vp_objection->set_static_duration(shout_static_time);
     ui_vp_objection->set_max_duration(shout_max_time);
-    QString filename;
-    switch (objection_mod) {
-    case 1:
-      filename = "holdit_bubble";
-      objection_player->play("holdit", m_chatmessage[CHAR_NAME],
-                             ao_app->get_chat(m_chatmessage[CHAR_NAME]));
-      break;
-    case 2:
-      filename = "objection_bubble";
-      objection_player->play("objection", m_chatmessage[CHAR_NAME],
-                             ao_app->get_chat(m_chatmessage[CHAR_NAME]));
-      break;
-    case 3:
-      filename = "takethat_bubble";
-      objection_player->play("takethat", m_chatmessage[CHAR_NAME],
-                             ao_app->get_chat(m_chatmessage[CHAR_NAME]));
-      break;
-    // case 4 is AO2 only
-    case 4:
-      if (custom_objection != "") {
-        filename = "custom_objections/" + custom_objection.left(custom_objection.lastIndexOf("."));
-        objection_player->play(filename,
-            m_chatmessage[CHAR_NAME],
-            ao_app->get_chat(m_chatmessage[CHAR_NAME]));
-      }
-      else {
-        filename = "custom";
-        objection_player->play(
-            "custom", m_chatmessage[CHAR_NAME],
-            ao_app->get_chat(m_chatmessage[CHAR_NAME]));
-      }
-      break;
-      m_chatmessage[EMOTE_MOD] = QChar(ushort(PREANIM));
-    }
+    objection_player->play(sfx_name, m_chatmessage[CHAR_NAME],
+                           ao_app->get_chat(m_chatmessage[CHAR_NAME]));
     ui_vp_video->set_muted(true);
     ui_vp_objection->load_image(
         filename, m_chatmessage[CHAR_NAME],
@@ -4738,8 +4762,6 @@ void Courtroom::handle_song(QStringList *p_contents)
   int effect_flags = 0; // No effects by default - vanilla functionality
 
   QString f_song = f_contents.at(0);
-  QString f_song_clear = QUrl(f_song).fileName();
-  f_song_clear = f_song_clear.left(f_song_clear.lastIndexOf('.'));
 
   int n_char = f_contents.at(1).toInt(&ok);
   if (!ok)
@@ -4762,19 +4784,66 @@ void Courtroom::handle_song(QStringList *p_contents)
       return;
   }
 
-  if(!file_exists(ao_app->get_sfx_suffix(ao_app->get_music_path(f_song))) && !f_song.startsWith("http")
-          && f_song != "~stop.mp3" && !ao_app->asset_url.isEmpty()) {
-      f_song = (ao_app->asset_url + "sounds/music/" + f_song).toLower();
+  QString showname_override;
+  if (p_contents->length() > 2) {
+    showname_override = p_contents->at(2);
   }
 
+  play_song(f_song, n_char, showname_override, looping, channel, effect_flags);
+}
+
+void Courtroom::play_song(QString f_song, int n_char, QString showname_override,
+                          bool looping, int channel, int effect_flags)
+{
+  QString f_song_clear = QUrl(f_song).fileName();
+  f_song_clear = f_song_clear.left(f_song_clear.lastIndexOf('.'));
+
   bool is_stop = (f_song == "~stop.mp3");
+
+  QString music_name = f_song;
+
+  if (!is_stop && !f_song.startsWith("http") &&
+      !file_exists(ao_app->get_sfx_suffix(ao_app->get_music_path(music_name))))
+  {
+    if (Options::getInstance().webcacheEnabled())
+    {
+      // unless the server explicitly feeds us music extensions, default assumption is
+      // the song already has it.
+      const QStringList extensions = ao_app->assetExtensions(
+          "music_extensions", {});
+      const QString lowerPath = ao_app->webcache()->resolveOrDownload(
+                ao_app->get_music_path(music_name).toQString(), extensions);
+      if (!lowerPath.isEmpty())
+      {
+        PendingSong pending;
+        pending.song = f_song;
+        pending.char_id = n_char;
+        pending.showname_override = showname_override;
+        pending.looping = looping;
+        pending.channel = channel;
+        pending.effect_flags = effect_flags;
+        m_pending_songs.insert(lowerPath, pending);
+
+        if (channel == 0)
+        {
+          ui_music_display->show();
+          ui_music_name->setText(tr("[LOADING] %1").arg(f_song_clear));
+        }
+        return;
+      }
+    }
+
+    if (!ao_app->asset_url.isEmpty())
+    {
+      f_song = (ao_app->asset_url + "sounds/music/" + f_song).toLower();
+    }
+  }
+
   if (n_char >= 0 && n_char < char_list.size()) {
     QString str_char = char_list.at(n_char).name;
     QString str_show = ao_app->get_showname(str_char);
-    if (p_contents->length() > 2) {
-      if (p_contents->at(2) != "") {
-        str_show = p_contents->at(2);
-      }
+    if (!showname_override.isEmpty()) {
+      str_show = showname_override;
     }
     if (!mute_map.value(n_char)) {
       bool selfname = n_char == m_cid;
@@ -4798,11 +4867,15 @@ void Courtroom::handle_song(QStringList *p_contents)
     ui_music_display->show();
     ui_music_name->setText(tr("[LOADING] %1").arg(f_song_clear));
   }
+
+  // Local playback uses the extension-less name so cached files with any
+  // supported extension are found. Remote streams need the full URL.
+  const QString playback_song = f_song.startsWith("http") ? f_song : music_name;
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-  music_player->music_watcher.setFuture(QtConcurrent::run(music_player, &AOMusicPlayer::play, f_song, channel,
+  music_player->music_watcher.setFuture(QtConcurrent::run(music_player, &AOMusicPlayer::play, playback_song, channel,
                                                           looping, effect_flags));
 #else
-  music_player->music_watcher.setFuture(QtConcurrent::run(&AOMusicPlayer::play, music_player, f_song, channel,
+  music_player->music_watcher.setFuture(QtConcurrent::run(&AOMusicPlayer::play, music_player, playback_song, channel,
                                                           looping, effect_flags));
 #endif
 }
@@ -7053,6 +7126,15 @@ Courtroom::~Courtroom()
 
 void Courtroom::on_webcache_file_downloaded(const QString &relativePath)
 {
+  auto song_it = m_pending_songs.find(relativePath);
+  if (song_it != m_pending_songs.end())
+  {
+    const PendingSong pending = song_it.value();
+    m_pending_songs.erase(song_it);
+    play_song(pending.song, pending.char_id, pending.showname_override,
+              pending.looping, pending.channel, pending.effect_flags);
+  }
+
   // Invalidate the asset lookup cache so future lookups find the cached file
   // ao_app->invalidate_lookup_cache();
   QString char_name;
@@ -7082,6 +7164,17 @@ void Courtroom::on_webcache_file_downloaded(const QString &relativePath)
 
 void Courtroom::on_webcache_download_failed(const QString &relativePath)
 {
+  auto song_it = m_pending_songs.find(relativePath);
+  if (song_it != m_pending_songs.end())
+  {
+    const PendingSong pending = song_it.value();
+    m_pending_songs.erase(song_it);
+    // Re-run resolution so the next advertised extension can be attempted,
+    // then fall through to the streaming fallback if nothing is left.
+    play_song(pending.song, pending.char_id, pending.showname_override,
+              pending.looping, pending.channel, pending.effect_flags);
+  }
+
   // beyond this point is the message queue logic
   if (pending_chatmessage.isEmpty() || ao_app->webcache()->pendingDownloads() > 0)
     return;

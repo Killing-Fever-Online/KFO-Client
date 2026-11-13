@@ -121,10 +121,14 @@ QString AOApplication::get_pos_path(const QString& pos, const bool desk)
   QString f_desk_image = "wit_overlay";
 
   if (desk) {
-    f_desk_image = get_old_pos_path(pos, desk);
+    QString old_pos_path = get_old_pos_path(pos, desk);
+    if (!old_pos_path.isEmpty())
+      f_desk_image = old_pos_path;
   }
   else {
-    f_background = get_old_pos_path(pos, desk);
+    QString old_pos_path = get_old_pos_path(pos, desk);
+    if (!old_pos_path.isEmpty())
+      f_background = old_pos_path;
   }
 
   // Special desk handling
@@ -359,7 +363,7 @@ QString AOApplication::get_image(QString p_element, QString p_theme, QString p_s
   return ret;
 }
 
-QString AOApplication::get_sfx(QString p_sfx, QString p_misc, QString p_character)
+QVector<VPath> AOApplication::get_sfx_paths(QString p_sfx, QString p_misc, QString p_character)
 {
   QVector<VPath> pathlist;
   // Sounds subfolder is prioritized for organization sake
@@ -368,13 +372,47 @@ QString AOApplication::get_sfx(QString p_sfx, QString p_misc, QString p_characte
   pathlist += get_asset_paths(p_sfx, Options::getInstance().theme(), Options::getInstance().subTheme(), default_theme, p_misc, p_character);
   // If SFX not found, search base/sounds/general/ folder
   pathlist += get_sounds_path(p_sfx);
-  QString ret = get_sfx_path(pathlist);
+  return pathlist;
+}
+
+QString AOApplication::get_sfx(QString p_sfx, QString p_misc, QString p_character)
+{
+  QString ret = get_sfx_path(get_sfx_paths(p_sfx, p_misc, p_character));
   if (ret.isEmpty()) {
     qWarning().nospace() << "could not find sfx " << p_sfx
                          << " (char = " << p_character
                          << ", misc = " << p_misc << ")";
   }
   return ret;
+}
+
+QString AOApplication::download_sfx(QString p_sfx, QString p_misc, QString p_character)
+{
+  if (!Options::getInstance().webcacheEnabled() || asset_url.isEmpty())
+  {
+    return QString();
+  }
+
+  const QStringList extensions = assetExtensions(
+      "sfx_extensions", {".opus", ".ogg", ".mp3", ".wav"});
+  if (extensions.isEmpty())
+  {
+    // The manifest is authoritative and didn't advertise SFX extensions.
+    return QString();
+  }
+
+  const QVector<VPath> pathlist = get_sfx_paths(p_sfx, p_misc, p_character);
+  for (const VPath &path : pathlist)
+  {
+    QString lowerPath = webcache()->resolve(path.toQString(), extensions);
+    if (!lowerPath.isEmpty())
+    {
+      webcache()->download(lowerPath);
+      return lowerPath;
+    }
+  }
+
+  return QString();
 }
 
 QString AOApplication::get_case_sensitive_path(QString p_file)

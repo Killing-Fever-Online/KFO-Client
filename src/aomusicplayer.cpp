@@ -1,6 +1,5 @@
 #include "aomusicplayer.h"
 #include "options.h"
-#include "webcache.h"
 
 #include "bass.h"
 #include "file_functions.h"
@@ -43,13 +42,9 @@ QString AOMusicPlayer::play(QString p_song, int channel, bool loop,
   }
   else {
     VPath vpath = ao_app->get_music_path(p_song);
-    f_path = ao_app->get_real_path(vpath);
-
-    // // Trigger webcache download if file not found locally
-    // if (f_path.isEmpty() && Options::getInstance().webcacheEnabled())
-    // {
-    //   ao_app->webcache()->resolveOrDownload(vpath.toQString(), {".opus", ".ogg", ".mp3", ".wav"});
-    // }
+    // get_sfx_suffix also probes the webcache for every supported audio
+    // extension, so a cached file with a different extension is found.
+    f_path = ao_app->get_sfx_suffix(vpath);
 
     if (f_path.endsWith(".mo3") || f_path.endsWith(".xm") || f_path.endsWith(".mod") || f_path.endsWith(".s3m") || f_path.endsWith(".it") || f_path.endsWith(".mtm") || f_path.endsWith(".umx") )
       newstream = BASS_MusicLoad(FALSE,f_path.utf16(), 0, 0, flags, 1);

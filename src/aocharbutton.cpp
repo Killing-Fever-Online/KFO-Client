@@ -68,17 +68,23 @@ void AOCharButton::set_image(QString p_character)
 {
   character = p_character;
   VPath char_path = ao_app->get_character_path(p_character, "char_icon");
-  QString image_path = ao_app->get_real_path(char_path, {".png"});
+  // Local lookups always use the broad list; only remote probing is governed
+  // by the server manifest.
+  const QStringList local_extensions = {".png", ".webp"};
+  QString image_path = ao_app->get_real_path(char_path, local_extensions);
 
   // WebCache DL the character icon
   if (Options::getInstance().webcacheEnabled() && !file_exists(image_path)) {
-    QString lowerPath = ao_app->webcache()->resolve(char_path.toQString(), {".png"});
-    qDebug() << "WebCache: resolving char icon of " << char_path.toQString();
-    if (!lowerPath.isEmpty()) {
-      qDebug() << "WebCache: starting download of char icon " << lowerPath;
-      download_path = lowerPath;
-      ao_app->webcache()->download(lowerPath);
-      return;
+    const QStringList extensions = ao_app->assetExtensions("charicon_extensions", local_extensions);
+    if (!extensions.isEmpty()) {
+      QString lowerPath = ao_app->webcache()->resolve(char_path.toQString(), extensions);
+      qDebug() << "WebCache: resolving char icon of " << char_path.toQString();
+      if (!lowerPath.isEmpty()) {
+        qDebug() << "WebCache: starting download of char icon " << lowerPath;
+        download_path = lowerPath;
+        ao_app->webcache()->download(lowerPath);
+        return;
+      }
     }
   }
   set_image_path(image_path);
