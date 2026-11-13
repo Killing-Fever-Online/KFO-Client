@@ -11,6 +11,7 @@
 
 #include <QApplication>
 #include <QFile>
+#include <QQueue>
 #include <QSettings>
 #include <QVector>
 
@@ -34,6 +35,7 @@ class NetworkManager;
 class Lobby;
 class Courtroom;
 class Options;
+class WebCache;
 class MountManager;
 class PackageInstaller;
 class ArchiveDropHandler;
@@ -68,6 +70,15 @@ public:
   Lobby *w_lobby;
   Courtroom *w_courtroom;
   AttorneyOnline::Discord *discord;
+
+  WebCache *webcache() const;
+  // Returns the server-advertised extensions for a category when available.
+  // If extensions.json could not be loaded, or no manifest was provided, the
+  // built-in fallbacks are returned for remote probing. An empty result while
+  // a manifest is loaded means the category is not advertised and remote
+  // probing should be skipped.
+  QStringList assetExtensions(const QString &category,
+                              const QStringList &fallbacks = {}) const;
 
   MountManager *mounts() const { return m_mounts; }
 
@@ -161,6 +172,7 @@ public:
   // implementation in path_functions.cpp
   VPath get_theme_path(QString p_file, QString p_theme="");
   VPath get_character_path(QString p_char, QString p_file);
+  QVector<VPath> get_emote_paths(QString p_filename, QString p_charname, bool p_is_preanim);
   VPath get_misc_path(QString p_misc, QString p_file);
   VPath get_sounds_path(QString p_file);
   VPath get_music_path(QString p_song);
@@ -174,13 +186,19 @@ public:
   QString get_config_value(QString p_identifier, QString p_config, QString p_theme="", QString p_subtheme="", QString p_default_theme="", QString p_misc="");
   QString get_asset(QString p_element, QString p_theme="", QString p_subtheme="", QString p_default_theme="", QString p_misc="", QString p_character="", QString p_placeholder="");
   QString get_image(QString p_element, QString p_theme="", QString p_subtheme="", QString p_default_theme="", QString p_misc="", QString p_character="", QString p_placeholder="", bool static_image=false);
+  QVector<VPath> get_sfx_paths(QString p_sfx, QString p_misc="", QString p_character="");
   QString get_sfx(QString p_sfx, QString p_misc="", QString p_character="");
+  QString download_sfx(QString p_sfx, QString p_misc="", QString p_character="");
   QString get_pos_path(const QString& pos, bool desk = false);
   // pre-2.8 old style pos handling
   QString get_old_pos_path(const QString& pos, bool desk = false);
+  // Returns the server-dictated desk overlay path for pos, or empty.
+  QString get_pos_server_overlay(const QString &pos);
   QString get_case_sensitive_path(QString p_file);
   QString get_real_path(const VPath &vpath, const QStringList &suffixes={""});
   void invalidate_lookup_cache();
+  QString lowercasePath(const QString &path);
+  QString urlEncodePath(const QString &path);
 
   ////// Functions for reading and writing files //////
   // Implementations file_functions.cpp
@@ -359,6 +377,8 @@ public:
 
   // Returns p_char's blips (previously called their "gender")
   QString get_blips(QString p_char);
+  QString get_blip_name(QString p_char);
+  QString download_blips(QString p_char);
 
   // Get a property of a given emote, or get it from "options" if emote doesn't have it
   QString get_emote_property(QString p_char, QString p_emote, QString p_property);
@@ -408,6 +428,19 @@ private:
   const int MAJOR_VERSION = 10;
   const int MINOR_VERSION = 1;
   const int HOTFIX = 0;
+
+  WebCache *m_webcache = nullptr;
+
+  // While extensions.json is being fetched, server packets are held back so no
+  // asset is resolved with built-in fallbacks before the manifest is known.
+  struct PausedServerPacket
+  {
+    QString header;
+    QStringList contents;
+  };
+  bool m_waiting_for_extensions = false;
+  QQueue<PausedServerPacket> m_paused_server_packets;
+  void processPausedServerPackets();
 
   MountManager *m_mounts = nullptr;
   PackageInstaller *m_package_installer = nullptr;

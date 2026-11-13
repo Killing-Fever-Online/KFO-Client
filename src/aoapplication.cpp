@@ -9,6 +9,7 @@
 #include "mount_manager.h"
 #include "networkmanager.h"
 #include "options.h"
+#include "webcache.h"
 #include "package_installer.h"
 
 #include "widgets/aooptionsdialog.h"
@@ -33,6 +34,11 @@ AOApplication::AOApplication(int &argc, char **argv) : QApplication(argc, argv)
 
   net_manager = new NetworkManager(this);
   discord = new AttorneyOnline::Discord();
+  m_webcache = new WebCache(this);
+  connect(m_webcache, &WebCache::extensionsLoaded, this,
+          &AOApplication::processPausedServerPackets);
+  connect(m_webcache, &WebCache::extensionsFailed, this,
+          &AOApplication::processPausedServerPackets);
 
   m_mounts = new MountManager(this);
   m_mounts->initialize();
@@ -71,6 +77,50 @@ AOApplication::~AOApplication()
   destruct_courtroom();
   delete discord;
   qInstallMessageHandler(original_message_handler);
+}
+
+WebCache *AOApplication::webcache() const
+{
+  return m_webcache;
+}
+
+QStringList AOApplication::assetExtensions(const QString &category,
+                                           const QStringList &fallbacks) const
+{
+  if (m_webcache == nullptr)
+  {
+    return fallbacks;
+  }
+  // Never probe with guesses while the manifest is still being fetched.
+  if (m_webcache->hasPendingExtensionsFetch())
+  {
+    return QStringList();
+  }
+  if (!m_webcache->hasServerExtensions())
+  {
+    return fallbacks;
+  }
+  return m_webcache->extensions(category);
+}
+
+void AOApplication::processPausedServerPackets()
+{
+  if (!m_waiting_for_extensions)
+  {
+    return;
+  }
+  m_waiting_for_extensions = false;
+
+  // Work from a local copy: replaying may queue new packets (e.g. another
+  // ASS for a different asset URL) that must wait for the next resolution.
+  QQueue<PausedServerPacket> queued;
+  queued.swap(m_paused_server_packets);
+  while (!queued.isEmpty())
+  {
+    const PausedServerPacket packet = queued.dequeue();
+    AOPacket *ao_packet = new AOPacket(packet.header, packet.contents);
+    server_packet_received(ao_packet);
+  }
 }
 
 void AOApplication::construct_lobby()

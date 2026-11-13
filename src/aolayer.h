@@ -178,11 +178,26 @@ class BackgroundLayer : public AOLayer {
   Q_OBJECT
 public:
   BackgroundLayer(QWidget *p_parent, AOApplication *p_ao_app);
-  void load_image(QString p_filename);
+  // Returns true if a download was started (or is already in flight).
+  // The exact filenames come from positions.ini when available.
+  bool download_image(QString p_position, bool p_desk = false);
+
+  void load_image(QString p_position, bool p_desk = false);
+  bool hasPendingDownload() const { return !m_pending_path.isEmpty(); }
 signals:
   void hide_void();
 protected slots:
   void fadein_finished() override; // overridden to send the courtroom a signal to hide the void element
+private:
+  // Ensures positions.ini is available before resolving a background.
+  // Returns true while the positions.ini download is started or in flight.
+  bool ensure_positions_ini(const QString &p_position, bool p_desk);
+  void on_webcache_file_downloaded(const QString &relativePath);
+  void on_webcache_download_failed(const QString &relativePath);
+
+  QString m_pending_position;
+  bool m_pending_desk = false;
+  QString m_pending_path;
 };
 
 class CharLayer : public AOLayer {
@@ -193,6 +208,9 @@ public:
   bool is_preanim;     // equivalent to the old play_once, if true we don't want
                        // to loop this
   QString prefix = ""; // prefix, left blank if it's a preanim
+
+  // returns true if download is needed or not
+  bool download_image(QString p_filename, QString p_charname, bool p_is_preanim);
 
   void load_image(QString p_filename, QString p_charname, int p_duration, bool p_is_preanim);
   void play(); // overloaded so we can play effects
@@ -243,7 +261,23 @@ class SplashLayer : public AOLayer {
   Q_OBJECT
 public:
   SplashLayer(QWidget *p_parent, AOApplication *p_ao_app);
+  // returns true if a webcache download was started. Set p_reload_on_finish to
+  // false when prefetching, so the image isn't played before the message that
+  // requested it is unpacked.
+  bool download_image(QString p_filename, QString p_charname, QString p_miscname,
+                      bool p_reload_on_finish = true);
   void load_image(QString p_filename, QString p_charname, QString p_miscname);
+
+private:
+  QString m_pending_filename;
+  QString m_pending_charname;
+  QString m_pending_miscname;
+  QString m_pending_path;
+  bool m_reload_on_finish = true;
+
+private slots:
+  void on_webcache_file_downloaded(const QString &relativePath);
+  void on_webcache_download_failed(const QString &relativePath);
 };
 
 class EffectLayer : public AOLayer {
@@ -265,6 +299,14 @@ class StickerLayer : public AOLayer {
 public:
   StickerLayer(QWidget *p_parent, AOApplication *p_ao_app);
   void load_image(QString p_charname);
+
+private:
+  QString m_pending_charname;
+  QString m_pending_path;
+
+private slots:
+  void on_webcache_file_downloaded(const QString &relativePath);
+  void on_webcache_download_failed(const QString &relativePath);
 };
 
 #endif // AOLAYER_H

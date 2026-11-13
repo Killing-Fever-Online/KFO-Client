@@ -6,6 +6,7 @@
 #include "mount_manager.h"
 #include "networkmanager.h"
 #include "options.h"
+#include "webcache.h"
 #include "package_metadata.h"
 
 #include <QCheckBox>
@@ -740,6 +741,35 @@ void AOOptionsDialog::setupUI()
   registerOption<QCheckBox, bool>("asset_streaming_cb",
                                   &Options::assetStreaming,
                                   &Options::setAssetStreaming);
+
+  // Webcache settings
+  FROM_UI(QCheckBox, webcache_enabled_cb)
+  FROM_UI(QSpinBox, webcache_expiry_spinbox)
+  FROM_UI(QPushButton, webcache_clear)
+  FROM_UI(QLabel, webcache_size_label)
+
+  registerOption<QCheckBox, bool>("webcache_enabled_cb", &Options::webcacheEnabled, &Options::setWebcacheEnabled);
+  registerOption<QSpinBox, int>("webcache_expiry_spinbox", &Options::webcacheExpiryHours, &Options::setWebcacheExpiryHours);
+
+  connect(ui_webcache_clear, &QPushButton::clicked, this, [this] {
+    ao_app->webcache()->clearCache();
+    ui_webcache_size_label->setText(tr("Cache cleared"));
+  });
+
+  // Update cache size display
+  {
+    qint64 sizeBytes = ao_app->webcache()->getCacheSize();
+    QString sizeStr;
+    if (sizeBytes < 1024)
+      sizeStr = QString::number(sizeBytes) + " B";
+    else if (sizeBytes < 1024 * 1024)
+      sizeStr = QString::number(sizeBytes / 1024.0, 'f', 1) + " KB";
+    else if (sizeBytes < 1024 * 1024 * 1024)
+      sizeStr = QString::number(sizeBytes / (1024.0 * 1024.0), 'f', 1) + " MB";
+    else
+      sizeStr = QString::number(sizeBytes / (1024.0 * 1024.0 * 1024.0), 'f', 2) + " GB";
+    ui_webcache_size_label->setText(tr("Cache size: %1").arg(sizeStr));
+  }
 
   // Callwords tab. This could just be a QLineEdit, but no, we decided to allow
   // people to put a billion entries in.

@@ -4,6 +4,7 @@
 #include "debug_functions.h"
 #include "file_functions.h"
 #include "hardware_functions.h"
+#include "webcache.h"
 
 #include <QHash>
 #include <QMessageBox>
@@ -184,8 +185,8 @@ void Courtroom::char_clicked(int n_char)
   if (n_char != -1)
   {
     QString char_name = char_list.at(n_char).name;
-    QString char_ini_path = ao_app->get_real_path(
-          ao_app->get_character_path(char_name, "char.ini"));
+    VPath char_ini_vpath = ao_app->get_character_path(char_name, "char.ini");
+    QString char_ini_path = ao_app->get_real_path(char_ini_vpath);
     ao_app->net_manager->streamed_charname = char_name;
 
     if (!file_exists(char_ini_path)) {
@@ -193,40 +194,53 @@ void Courtroom::char_clicked(int n_char)
         call_error(tr("Could not find character (char.ini) for %1").arg(char_name));
         return;
       } else {
-        QMessageBox msgBox;
-        msgBox.setText(tr("Could not find character (char.ini) for %1.\nAvailable asset url: %2").arg(char_name).arg(ao_app->asset_url));
-        msgBox.setInformativeText(tr("Do you want to download the character or use it via streaming?"));
-        QPushButton* btn1 = msgBox.addButton(tr("Download"), QMessageBox::AcceptRole);
-        QPushButton* btn2 = msgBox.addButton(tr("Streaming"), QMessageBox::AcceptRole);
-        QPushButton* btn3 = msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
-        msgBox.setDefaultButton(btn3);
-        msgBox.exec();
-    
-        if (msgBox.clickedButton() == btn1) {
-            // I WILL change this later...
-            QString download_path = VPath(ao_app->asset_url + "characters/" + char_name + "/").toQString();
-            QString download_path_lower = VPath(ao_app->asset_url + "characters/" + char_name.toLower() + "/").toQString();
-            QStringList paths_to_download;
-            paths_to_download << download_path_lower << download_path;
-            qDebug() << paths_to_download;
-            ao_app->net_manager->download_folder(paths_to_download);
-            return;
-        } else if (msgBox.clickedButton() == btn2) {
-            QString streamed_ini_path = VPath(ao_app->asset_url + "characters/" + char_name + "/char.ini").toQString();
-            QString streamed_ini_path_lower = VPath(ao_app->asset_url + "characters/" + char_name.toLower() + "/char.ini").toQString();
-            qDebug() << streamed_ini_path;
-            ao_app->net_manager->start_image_streaming(streamed_ini_path, "");
-            ao_app->net_manager->start_image_streaming(streamed_ini_path_lower, "");
-        } else {
-            return;
+        // WebCache DL the char.ini
+        if (Options::getInstance().webcacheEnabled()) {
+          download_char_ini(char_name);
+          return;
         }
+        // QMessageBox msgBox;
+        // msgBox.setText(tr("Could not find character (char.ini) for %1.\nAvailable asset url: %2").arg(char_name).arg(ao_app->asset_url));
+        // msgBox.setInformativeText(tr("Do you want to download the character or use it via streaming?"));
+        // QPushButton* btn1 = msgBox.addButton(tr("Download"), QMessageBox::AcceptRole);
+        // QPushButton* btn2 = msgBox.addButton(tr("Streaming"), QMessageBox::AcceptRole);
+        // QPushButton* btn3 = msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
+        // msgBox.setDefaultButton(btn3);
+        // msgBox.exec();
+
+        // if (msgBox.clickedButton() == btn1) {
+        //     // I WILL change this later...
+        //     QString download_path = VPath(ao_app->asset_url + "characters/" + char_name + "/").toQString();
+        //     QString download_path_lower = VPath(ao_app->asset_url + "characters/" + char_name.toLower() + "/").toQString();
+        //     QStringList paths_to_download;
+        //     paths_to_download << download_path_lower << download_path;
+        //     qDebug() << paths_to_download;
+        //     ao_app->net_manager->download_folder(paths_to_download);
+        //     return;
+        // } else if (msgBox.clickedButton() == btn2) {
+        //     QString streamed_ini_path = VPath(ao_app->asset_url + "characters/" + char_name + "/char.ini").toQString();
+        //     QString streamed_ini_path_lower = VPath(ao_app->asset_url + "characters/" + char_name.toLower() + "/char.ini").toQString();
+        //     qDebug() << streamed_ini_path;
+        //     ao_app->net_manager->start_image_streaming(streamed_ini_path, "");
+        //     ao_app->net_manager->start_image_streaming(streamed_ini_path_lower, "");
+        // } else {
+        //     return;
+        // }
         return;
       }
     }
-
     qDebug() << "Found char.ini for" << char_name << "at" << char_ini_path;
+    set_charname(char_name);
   }
+}
 
+void Courtroom::set_charname(QString char_name)
+{
+  int n_char = -1;
+  for (int cid = 0; cid < char_list.size(); cid++) {
+    if (char_list.at(cid).name == char_name)
+      n_char = cid;
+  }
   if (n_char != m_cid || n_char == -1) {
     ao_app->send_server_packet(
         new AOPacket("PW", {ui_char_password->text()}));

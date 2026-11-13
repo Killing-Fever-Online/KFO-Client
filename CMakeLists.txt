@@ -66,6 +66,7 @@ qt_add_executable(Attorney_Online
   src/widgets/edit_server_dialog.h
   src/widgets/moderator_dialog.h
   src/widgets/playerlistwidget.h
+  src/webcache.h
 src/aoapplication.cpp
   src/archive_drop_handler.cpp
   src/archive_extractor.cpp
@@ -115,6 +116,7 @@ src/aoapplication.cpp
   src/widgets/edit_server_dialog.cpp
   src/widgets/moderator_dialog.cpp
   src/widgets/playerlistwidget.cpp
+  src/webcache.cpp
   resources.qrc
 )
 

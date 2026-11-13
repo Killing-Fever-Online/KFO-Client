@@ -730,6 +730,60 @@
                 </property>
                </widget>
               </item>
+              <item row="12" column="0">
+               <widget class="QLabel" name="webcache_enabled_lbl">
+                <property name="toolTip">
+                 <string>Enable caching of downloaded assets from the server's asset URL. Cached files are stored locally and reused until expired.</string>
+                </property>
+                <property name="text">
+                 <string>Webcache:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="12" column="1">
+               <widget class="QCheckBox" name="webcache_enabled_cb">
+                <property name="text">
+                 <string/>
+                </property>
+               </widget>
+              </item>
+              <item row="12" column="2">
+               <widget class="QLabel" name="webcache_expiry_lbl">
+                <property name="toolTip">
+                 <string>How many hours before cached files are re-downloaded.</string>
+                </property>
+                <property name="text">
+                 <string>Cache Expiry (hours):</string>
+                </property>
+               </widget>
+              </item>
+              <item row="12" column="3">
+               <widget class="QSpinBox" name="webcache_expiry_spinbox">
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <number>8760</number>
+                </property>
+                <property name="value">
+                 <number>24</number>
+                </property>
+               </widget>
+              </item>
+              <item row="13" column="0">
+               <widget class="QPushButton" name="webcache_clear">
+                <property name="text">
+                 <string>Clear Cache</string>
+                </property>
+               </widget>
+              </item>
+              <item row="13" column="1" colspan="3">
+               <widget class="QLabel" name="webcache_size_label">
+                <property name="text">
+                 <string/>
+                </property>
+               </widget>
+              </item>
              </layout>
             </widget>
            </item>

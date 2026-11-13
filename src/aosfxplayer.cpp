@@ -1,10 +1,16 @@
 #include "aosfxplayer.h"
 #include "file_functions.h"
+#include "options.h"
+#include "webcache.h"
 
 AOSfxPlayer::AOSfxPlayer(QWidget *parent, AOApplication *p_ao_app)
+    : QObject(p_ao_app)
 {
   m_parent = parent;
   ao_app = p_ao_app;
+
+  connect(ao_app->webcache(), &WebCache::fileDownloaded, this, &AOSfxPlayer::on_webcache_file_downloaded);
+  connect(ao_app->webcache(), &WebCache::downloadFailed, this, &AOSfxPlayer::on_webcache_download_failed);
 }
 
 void AOSfxPlayer::clear()
@@ -26,6 +32,25 @@ void AOSfxPlayer::loop_clear()
 
 void AOSfxPlayer::play(QString p_sfx, QString p_character, QString p_misc)
 {
+  QString path = ao_app->get_sfx(p_sfx, p_misc, p_character);
+
+  // If the sound is not present locally, request it through the webcache and
+  // play it once the download finishes.
+  if (path.isEmpty() && Options::getInstance().webcacheEnabled())
+  {
+    const QString lowerPath = ao_app->download_sfx(p_sfx, p_misc, p_character);
+    if (!lowerPath.isEmpty())
+    {
+      PendingSfx pending;
+      pending.sfx = p_sfx;
+      pending.character = p_character;
+      pending.misc = p_misc;
+      pending.relativePath = lowerPath;
+      m_pending_sfx.insert(lowerPath, pending);
+      return;
+    }
+  }
+
   for (int i = 0; i < m_channelmax; ++i) {
     if (BASS_ChannelIsActive(m_stream_list[i]) == BASS_ACTIVE_PLAYING)
       m_channel = (i + 1) % m_channelmax;
@@ -34,7 +59,7 @@ void AOSfxPlayer::play(QString p_sfx, QString p_character, QString p_misc)
       break;
     }
   }
-  QString path = ao_app->get_sfx(p_sfx, p_misc, p_character);
+
   if (path.endsWith(".opus"))
     m_stream_list[m_channel] = BASS_OPUS_StreamCreateFile(
         FALSE, path.utf16(), 0, 0,
@@ -98,4 +123,31 @@ void AOSfxPlayer::set_looping(bool toggle, int channel)
       BASS_ChannelFlags(m_stream_list[channel], BASS_SAMPLE_LOOP,
                         BASS_SAMPLE_LOOP); // set the LOOP flag
   }
+}
+
+void AOSfxPlayer::on_webcache_file_downloaded(const QString &relativePath)
+{
+  auto it = m_pending_sfx.find(relativePath);
+  if (it == m_pending_sfx.end())
+  {
+    return;
+  }
+
+  const PendingSfx pending = it.value();
+  m_pending_sfx.erase(it);
+  play(pending.sfx, pending.character, pending.misc);
+}
+
+void AOSfxPlayer::on_webcache_download_failed(const QString &relativePath)
+{
+  auto it = m_pending_sfx.find(relativePath);
+  if (it == m_pending_sfx.end())
+  {
+    return;
+  }
+
+  const PendingSfx pending = it.value();
+  m_pending_sfx.erase(it);
+  // Re-run resolution so the next advertised extension can be attempted.
+  play(pending.sfx, pending.character, pending.misc);
 }
