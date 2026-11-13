@@ -1830,7 +1830,10 @@ void Courtroom::set_pos_dropdown(QStringList pos_dropdowns)
   for (int n = 0; n < pos_dropdown_list.size(); ++n) {
     QString pos = pos_dropdown_list.at(n);
     ui_pos_dropdown->addItem(pos);
-    QPixmap image = QPixmap(ao_app->get_image_suffix(ao_app->get_background_path(ao_app->get_pos_path(pos))));
+    const QString pos_path = ao_app->get_pos_path(pos);
+    QPixmap image = pos_path.isEmpty()
+        ? QPixmap()
+        : QPixmap(ao_app->get_image_suffix(VPath(pos_path)));
     if (!image.isNull()) {
       image = image.scaledToHeight(ui_pos_dropdown->iconSize().height());
     }
@@ -2683,63 +2686,73 @@ void Courtroom::chatmessage_dequeue()
   pending_chatmessage.resize(MS_MAXIMUM);
 
   // Begin the logic for downloading the webcache assets, test if any downloads have actually started. If not, just unpack the chatmessage.
-  int dl_count = 0;
-  if (Options::getInstance().webcacheEnabled())
+  if (prefetch_pending_chatmessage_assets())
   {
-    // background
-    QString side = pending_chatmessage[SIDE];
-    if (current_side.isEmpty()) {
-        side = ao_app->get_char_side(pending_chatmessage[CHAR_NAME]);
-    }
-    dl_count += ui_vp_background->download_image(ao_app->get_pos_path(side));
-    dl_count += ui_vp_desk->download_image(ao_app->get_pos_path(side, true));
-
-    // download their char ini
-    dl_count += download_char_ini(pending_chatmessage[CHAR_NAME]);
-
-    // download the message's sound effect
-    // This mirrors play_sfx(), which doesn't pass a character or misc name.
-    const QString message_sfx = pending_chatmessage[SFX_NAME];
-    if (!message_sfx.isEmpty() && message_sfx != "1")
-    {
-      dl_count += !ao_app->download_sfx(message_sfx).isEmpty();
-    }
-
-    // download the shout bubble and objection sound
-    QString objection_filename;
-    QString objection_sfx;
-    get_objection_assets(pending_chatmessage[OBJECTION_MOD], objection_filename, objection_sfx);
-    if (!objection_filename.isEmpty())
-    {
-      dl_count += !ao_app->download_sfx(objection_sfx, ao_app->get_chat(pending_chatmessage[CHAR_NAME]), pending_chatmessage[CHAR_NAME]).isEmpty();
-      dl_count += ui_vp_objection->download_image(objection_filename, pending_chatmessage[CHAR_NAME], ao_app->get_chat(pending_chatmessage[CHAR_NAME]), false);
-    }
-
-    // download the character's blips
-    dl_count += !ao_app->download_blips(pending_chatmessage[CHAR_NAME]).isEmpty();
-
-    // download the main player
-    dl_count += ui_vp_player_char->download_image(pending_chatmessage[PRE_EMOTE], pending_chatmessage[CHAR_NAME], true);
-    dl_count += ui_vp_player_char->download_image("(b)" + pending_chatmessage[EMOTE], pending_chatmessage[CHAR_NAME], false);
-    dl_count += ui_vp_player_char->download_image("(a)" + pending_chatmessage[EMOTE], pending_chatmessage[CHAR_NAME], false);
-
-    // pairing madness
-    if (!pending_chatmessage[OTHER_CHARID].isEmpty())
-        dl_count += ui_vp_sideplayer_char->download_image("(b)" + pending_chatmessage[OTHER_EMOTE], pending_chatmessage[OTHER_NAME], false);
-    if (!pending_chatmessage[THIRD_CHARID].isEmpty())
-        dl_count += ui_vp_thirdplayer_char->download_image("(a)" + pending_chatmessage[THIRD_EMOTE], pending_chatmessage[THIRD_NAME], false);
-
-    // If even a single download started, we need to delay the unpacking
-    // (on_webcache_file_downloaded, on_webcache_download_failed signals handle the rest)
-    if (dl_count > 0)
-    {
-        qDebug() << "WebCache: " << dl_count << " downloads started. Delaying the queue";
-        return;
-    }
+    return;
   }
   // Downloading not necessary. Skip the webcache wait.
   unpack_chatmessage(pending_chatmessage);
   pending_chatmessage.clear();
+}
+
+bool Courtroom::prefetch_pending_chatmessage_assets()
+{
+  if (pending_chatmessage.isEmpty() || !Options::getInstance().webcacheEnabled())
+  {
+    return false;
+  }
+
+  int dl_count = 0;
+
+  // background (positions.ini may need to be fetched first)
+  QString side = pending_chatmessage[SIDE];
+  if (current_side.isEmpty()) {
+      side = ao_app->get_char_side(pending_chatmessage[CHAR_NAME]);
+  }
+  dl_count += ui_vp_background->download_image(side);
+  dl_count += ui_vp_desk->download_image(side, true);
+
+  // download their char ini
+  dl_count += download_char_ini(pending_chatmessage[CHAR_NAME]);
+
+  // download the message's sound effect
+  // This mirrors play_sfx(), which doesn't pass a character or misc name.
+  const QString message_sfx = pending_chatmessage[SFX_NAME];
+  if (!message_sfx.isEmpty() && message_sfx != "1")
+  {
+    dl_count += !ao_app->download_sfx(message_sfx).isEmpty();
+  }
+
+  // download the shout bubble and objection sound
+  QString objection_filename;
+  QString objection_sfx;
+  get_objection_assets(pending_chatmessage[OBJECTION_MOD], objection_filename, objection_sfx);
+  if (!objection_filename.isEmpty())
+  {
+    dl_count += !ao_app->download_sfx(objection_sfx, ao_app->get_chat(pending_chatmessage[CHAR_NAME]), pending_chatmessage[CHAR_NAME]).isEmpty();
+    dl_count += ui_vp_objection->download_image(objection_filename, pending_chatmessage[CHAR_NAME], ao_app->get_chat(pending_chatmessage[CHAR_NAME]), false);
+  }
+
+  // download the character's blips
+  dl_count += !ao_app->download_blips(pending_chatmessage[CHAR_NAME]).isEmpty();
+
+  // download the main player
+  dl_count += ui_vp_player_char->download_image(pending_chatmessage[PRE_EMOTE], pending_chatmessage[CHAR_NAME], true);
+  dl_count += ui_vp_player_char->download_image("(b)" + pending_chatmessage[EMOTE], pending_chatmessage[CHAR_NAME], false);
+  dl_count += ui_vp_player_char->download_image("(a)" + pending_chatmessage[EMOTE], pending_chatmessage[CHAR_NAME], false);
+
+  // pairing madness
+  if (!pending_chatmessage[OTHER_CHARID].isEmpty())
+      dl_count += ui_vp_sideplayer_char->download_image("(b)" + pending_chatmessage[OTHER_EMOTE], pending_chatmessage[OTHER_NAME], false);
+  if (!pending_chatmessage[THIRD_CHARID].isEmpty())
+      dl_count += ui_vp_thirdplayer_char->download_image("(a)" + pending_chatmessage[THIRD_EMOTE], pending_chatmessage[THIRD_NAME], false);
+
+  if (dl_count > 0)
+  {
+      qDebug() << "WebCache: " << dl_count << " downloads started. Delaying the queue";
+      return true;
+  }
+  return false;
 }
 
 void Courtroom::skip_chatmessage_queue()
@@ -4687,8 +4700,8 @@ void Courtroom::set_scene(bool show_desk, QString f_side)
   if (current_side.isEmpty()) {
     f_side = ao_app->get_char_side(current_char);
   }
-  ui_vp_background->load_image(ao_app->get_pos_path(f_side));
-  ui_vp_desk->load_image(ao_app->get_pos_path(f_side, true));
+  ui_vp_background->load_image(f_side);
+  ui_vp_desk->load_image(f_side, true);
 
   if (show_desk)
     ui_vp_desk->show();
@@ -7154,9 +7167,36 @@ void Courtroom::on_webcache_file_downloaded(const QString &relativePath)
     set_charname(char_name);
   }
 
+  // A remote positions.ini changes which positions are available.
+  if (relativePath.endsWith("/positions.ini"))
+  {
+    set_background(current_background, false);
+    if (pending_chatmessage.isEmpty())
+    {
+      // The layer that requested positions.ini already reloaded itself from
+      // its own signal handler. Refresh the other layer as well.
+      if (!ui_vp_background->hasPendingDownload())
+      {
+        ui_vp_background->load_image(current_side);
+      }
+      if (!ui_vp_desk->hasPendingDownload())
+      {
+        ui_vp_desk->load_image(current_side, true);
+      }
+    }
+  }
+
   // beyond this point is the message queue logic
-  if (pending_chatmessage.isEmpty() || ao_app->webcache()->pendingDownloads() > 0)
+  if (pending_chatmessage.isEmpty())
     return;
+
+  // Re-run resolution: a fetched positions.ini can now start the exact
+  // background downloads, and a completed background can let the message unpack.
+  if (prefetch_pending_chatmessage_assets())
+    return;
+  if (ao_app->webcache()->pendingDownloads() > 0)
+    return;
+
   // Process the finalized chat message (we ran out of pending downloads)
   unpack_chatmessage(pending_chatmessage);
   pending_chatmessage.clear();
@@ -7176,8 +7216,16 @@ void Courtroom::on_webcache_download_failed(const QString &relativePath)
   }
 
   // beyond this point is the message queue logic
-  if (pending_chatmessage.isEmpty() || ao_app->webcache()->pendingDownloads() > 0)
+  if (pending_chatmessage.isEmpty())
     return;
+
+  // Re-run resolution so a failed positions.ini can fall back to legacy
+  // background names, and a failed candidate can let the message unpack.
+  if (prefetch_pending_chatmessage_assets())
+    return;
+  if (ao_app->webcache()->pendingDownloads() > 0)
+    return;
+
   // Process the finalized chat message (we ran out of pending downloads)
   unpack_chatmessage(pending_chatmessage);
   pending_chatmessage.clear();

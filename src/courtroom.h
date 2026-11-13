@@ -1182,6 +1182,9 @@ private slots:
 
   // Proceed to parse the oldest chatmessage and remove it from the stack
   void chatmessage_dequeue();
+  // Starts webcache downloads for pending_chatmessage.
+  // Returns true if at least one download was started.
+  bool prefetch_pending_chatmessage_assets();
 
   void preview_emote(QString emote);
   void update_emote_preview();

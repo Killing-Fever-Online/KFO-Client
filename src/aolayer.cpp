@@ -7,6 +7,8 @@
 #include "options.h"
 #include "webcache.h"
 
+#include <QFileInfo>
+
 static QThreadPool *thread_pool;
 
 static QStringList webcache_image_extensions(AOApplication *ao_app, const QString &category)
@@ -56,6 +58,8 @@ AOLayer::AOLayer(QWidget *p_parent, AOApplication *p_ao_app) : QLabel(p_parent)
 BackgroundLayer::BackgroundLayer(QWidget *p_parent, AOApplication *p_ao_app)
     : AOLayer(p_parent, p_ao_app)
 {
+  connect(ao_app->webcache(), &WebCache::fileDownloaded, this, &BackgroundLayer::on_webcache_file_downloaded);
+  connect(ao_app->webcache(), &WebCache::downloadFailed, this, &BackgroundLayer::on_webcache_download_failed);
 }
 CharLayer::CharLayer(QWidget *p_parent, AOApplication *p_ao_app)
     : AOLayer(p_parent, p_ao_app)
@@ -167,29 +171,95 @@ void AOLayer::move_and_center(int ax, int ay)
     center_pixmap(movie_frames[0]); // just use the first frame since dimensions are all that matter
 }
 
-bool BackgroundLayer::download_image(QString p_filename)
+bool BackgroundLayer::ensure_positions_ini(const QString &p_position, bool p_desk)
 {
-  // Trigger webcache download if file not found locally
-  VPath vpath = ao_app->get_background_path(p_filename);
-  QString file_path = ao_app->get_image_suffix(vpath);
-  if (file_path.isEmpty() && Options::getInstance().webcacheEnabled())
+  const VPath ini_path = ao_app->get_background_path("positions.ini");
+
+  // Local or previously cached positions.ini is authoritative.
+  if (!ao_app->get_real_path(ini_path).isEmpty())
   {
-    const QStringList extensions = ao_app->assetExtensions(
-        "background_extensions", {".webp", ".apng", ".gif", ".png"});
-    if (!extensions.isEmpty())
-    {
-      QString lowerPath = ao_app->webcache()->resolve(vpath.toQString(), extensions);
-      if (!lowerPath.isEmpty())
-      {
-        ao_app->webcache()->download(lowerPath);
-        return true;
-      }
-    }
+    return false;
   }
-  return false;
+
+  // Another layer may already be fetching it.
+  if (ao_app->webcache()->isPending(ini_path.toQString()))
+  {
+    return true;
+  }
+
+  const QString lowerPath = ao_app->webcache()->resolve(ini_path.toQString());
+  if (lowerPath.isEmpty())
+  {
+    return false;
+  }
+
+  m_pending_position = p_position;
+  m_pending_desk = p_desk;
+  m_pending_path = lowerPath;
+  qDebug() << "WebCache: starting download of" << lowerPath;
+  ao_app->webcache()->download(lowerPath);
+  return true;
 }
 
-void BackgroundLayer::load_image(QString p_filename)
+bool BackgroundLayer::download_image(QString p_position, bool p_desk)
+{
+  if (!Options::getInstance().webcacheEnabled() || ao_app->asset_url.isEmpty())
+  {
+    return false;
+  }
+
+  // Fetch positions.ini first when it isn't available locally or in cache.
+  if (ensure_positions_ini(p_position, p_desk))
+  {
+    return true;
+  }
+
+  const QString relative_path = ao_app->get_pos_path(p_position, p_desk);
+  if (relative_path.isEmpty())
+  {
+    return false;
+  }
+
+  const VPath vpath(relative_path);
+  if (!ao_app->get_image_suffix(vpath).isEmpty())
+  {
+    // Already available locally or in the webcache.
+    return false;
+  }
+
+  QStringList extensions;
+  if (QFileInfo(relative_path).suffix().isEmpty())
+  {
+    // Legacy fallback for backgrounds without positions.ini.
+    extensions = ao_app->assetExtensions(
+        "background_extensions", {".webp", ".apng", ".gif", ".png"});
+  }
+  else
+  {
+    // positions.ini gave us the exact filename: no extension guessing.
+    extensions = {""};
+  }
+
+  if (extensions.isEmpty())
+  {
+    return false;
+  }
+
+  const QString lowerPath = ao_app->webcache()->resolve(relative_path, extensions);
+  if (lowerPath.isEmpty())
+  {
+    return false;
+  }
+
+  m_pending_position = p_position;
+  m_pending_desk = p_desk;
+  m_pending_path = lowerPath;
+  qDebug() << "WebCache: starting download of background" << lowerPath;
+  ao_app->webcache()->download(lowerPath);
+  return true;
+}
+
+void BackgroundLayer::load_image(QString p_position, bool p_desk)
 {
   play_once = false;
   cull_image = false;
@@ -198,15 +268,65 @@ void BackgroundLayer::load_image(QString p_filename)
       ao_app->get_scaling(ao_app->read_design_ini("scaling", design_path));
   stretch = ao_app->read_design_ini("stretch", design_path).startsWith("true");
 #ifdef DEBUG_MOVIE
-  qDebug() << "[BackgroundLayer] BG loaded: " << p_filename;
+  qDebug() << "[BackgroundLayer] BG loaded: " << p_position
+           << " desk:" << p_desk;
 #endif
-  if (p_filename == last_path) {
+
+  const QString relative_path = ao_app->get_pos_path(p_position, p_desk);
+  QString resolved;
+  if (!relative_path.isEmpty())
+  {
+    resolved = ao_app->get_real_path(VPath(relative_path));
+    if (resolved.isEmpty())
+    {
+      resolved = ao_app->get_image_suffix(VPath(relative_path));
+    }
+  }
+
+  if (resolved.isEmpty())
+  {
+    if (download_image(p_position, p_desk))
+    {
+      // Keep the current image while the download runs.
+      return;
+    }
+  }
+
+  if (resolved == last_path) {
     // Don't restart background if background is unchanged
     return;
   }
 
-  start_playback(p_filename);
+  start_playback(resolved);
   play();
+}
+
+void BackgroundLayer::on_webcache_file_downloaded(const QString &relativePath)
+{
+  if (relativePath != m_pending_path)
+  {
+    return;
+  }
+
+  const QString position = m_pending_position;
+  const bool desk = m_pending_desk;
+  m_pending_path.clear();
+  load_image(position, desk);
+}
+
+void BackgroundLayer::on_webcache_download_failed(const QString &relativePath)
+{
+  if (relativePath != m_pending_path)
+  {
+    return;
+  }
+
+  const QString position = m_pending_position;
+  const bool desk = m_pending_desk;
+  m_pending_path.clear();
+  // Re-resolve: this either falls back to the legacy path when positions.ini
+  // failed, or lets WebCache try the next candidate.
+  load_image(position, desk);
 }
 
 bool CharLayer::download_image(QString p_filename, QString p_charname, bool p_is_preanim)

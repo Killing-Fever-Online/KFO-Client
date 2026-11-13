@@ -38,6 +38,16 @@ int WebCache::pendingDownloads() const
   return m_pending_downloads.size();
 }
 
+bool WebCache::isPending(const QString &relativePath) const
+{
+  const QString lowerPath = normalizeRelativePath(relativePath);
+  if (lowerPath.isEmpty())
+  {
+    return false;
+  }
+  return m_pending_downloads.contains(lowerPath);
+}
+
 QString WebCache::cacheSubdir() const
 {
   QString assetUrl = ao_app->asset_url;

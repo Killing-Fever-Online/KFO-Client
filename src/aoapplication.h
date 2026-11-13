@@ -192,6 +192,8 @@ public:
   QString get_pos_path(const QString& pos, bool desk = false);
   // pre-2.8 old style pos handling
   QString get_old_pos_path(const QString& pos, bool desk = false);
+  // Returns the server-dictated desk overlay path for pos, or empty.
+  QString get_pos_server_overlay(const QString &pos);
   QString get_case_sensitive_path(QString p_file);
   QString get_real_path(const VPath &vpath, const QStringList &suffixes={""});
   void invalidate_lookup_cache();

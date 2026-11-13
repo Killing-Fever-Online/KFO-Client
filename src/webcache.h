@@ -101,6 +101,11 @@ public:
   int pendingDownloads() const;
 
   /**
+   * @brief Whether a download for the given relative path is in flight.
+   */
+  bool isPending(const QString &relativePath) const;
+
+  /**
    * @brief Returns the cache subdirectory for the current server's asset URL.
    * E.g., "https://direct.grave.wine/base/" -> "direct.grave.wine/base/"
    */

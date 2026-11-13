@@ -116,65 +116,59 @@ VPath AOApplication::get_default_background_path(QString p_file)
 
 QString AOApplication::get_pos_path(const QString& pos, const bool desk)
 {
-  // Witness is default BG
-  QString f_background = "wit";
-  QString f_desk_image = "wit_overlay";
-
-  if (desk) {
-    QString old_pos_path = get_old_pos_path(pos, desk);
-    if (!old_pos_path.isEmpty())
-      f_desk_image = old_pos_path;
-  }
-  else {
-    QString old_pos_path = get_old_pos_path(pos, desk);
-    if (!old_pos_path.isEmpty())
-      f_background = old_pos_path;
-  }
-
-  // Special desk handling
-  QString desk_override = read_design_ini("overlays/" + f_background, get_background_path("design.ini"));
-  if (desk_override != "") {
-    f_desk_image = get_image_suffix(get_background_path(desk_override));
-  }
-
-  // DRO-style override handling
-  QString suffix = "back";
-  if (desk) {
-    suffix = "front";
-  }
-
-  // Read the positions.ini file
-  QString override = read_design_ini(pos + "/" + suffix, get_background_path("positions.ini"));
-  if (override != "") {
-    // Set both to the override (we only send back 1 of the 2 anyway)
-    f_desk_image = get_image_suffix(get_background_path(override));
-    f_background = get_image_suffix(get_background_path(override));
-  }
-
-  // Server dictates to override our overlay
-  if (w_courtroom->server_overlay != "") {
-    // Overlay is located inside of our BG folder
-    QString path_test = get_image_suffix(get_background_path(w_courtroom->server_overlay));
-    if (file_exists(path_test)) {
-      f_desk_image = path_test;
+  // DRO-style positions.ini declares exact filenames. When the requested key
+  // exists, use it verbatim instead of guessing extensions. Missing keys and
+  // missing positions.ini files fall back to the legacy resolution below.
+  const QString suffix = desk ? "front" : "back";
+  const QString override =
+      read_design_ini(pos + "/" + suffix, get_background_path("positions.ini"));
+  if (!override.isEmpty())
+  {
+    // The server can still dictate a desk overlay.
+    if (desk)
+    {
+      const QString server_overlay = get_pos_server_overlay(pos);
+      if (!server_overlay.isEmpty())
+      {
+        return server_overlay;
+      }
     }
-
-    // Specific overlay *folder* to access inside of the overlay folder
-    path_test = get_image_suffix(VPath("overlays/" + w_courtroom->server_overlay + "/" + pos));
-    if (file_exists(path_test)) {
-      f_desk_image = path_test;
-    }
-
-    // Specific file path to access inside of the overlay folder
-    path_test = get_image_suffix(VPath("overlays/" + w_courtroom->server_overlay));
-    if (file_exists(path_test)) {
-      f_desk_image = path_test;
-    }
+    return get_background_path(override).toQString();
   }
-  if (desk) {
-    return f_desk_image;
+
+  return get_old_pos_path(pos, desk);
+}
+
+QString AOApplication::get_pos_server_overlay(const QString &pos)
+{
+  if (w_courtroom == nullptr || w_courtroom->server_overlay.isEmpty())
+  {
+    return QString();
   }
-  return f_background;
+
+  QString result;
+  // Overlay is located inside of our BG folder
+  VPath path = get_background_path(w_courtroom->server_overlay);
+  if (!get_image_suffix(path).isEmpty())
+  {
+    result = path.toQString();
+  }
+
+  // Specific overlay *folder* to access inside of the overlay folder
+  path = VPath("overlays/" + w_courtroom->server_overlay + "/" + pos);
+  if (!get_image_suffix(path).isEmpty())
+  {
+    result = path.toQString();
+  }
+
+  // Specific file path to access inside of the overlay folder
+  path = VPath("overlays/" + w_courtroom->server_overlay);
+  if (!get_image_suffix(path).isEmpty())
+  {
+    result = path.toQString();
+  }
+
+  return result;
 }
 
 QString AOApplication::get_old_pos_path(const QString& pos, const bool desk)
@@ -235,10 +229,31 @@ QString AOApplication::get_old_pos_path(const QString& pos, const bool desk)
     f_desk_image = pos + "_overlay";
   }
 
-  if (desk) {
-    return get_image_suffix(get_background_path(f_desk_image));
+  // Special desk handling
+  QString desk_override = read_design_ini("overlays/" + f_background, get_background_path("design.ini"));
+  if (!desk_override.isEmpty())
+  {
+    f_desk_image = desk_override;
   }
-  return get_image_suffix(get_background_path(f_background));
+
+  // Server dictates to override our overlay
+  const QString server_overlay = get_pos_server_overlay(pos);
+  if (!server_overlay.isEmpty())
+  {
+    f_desk_image = server_overlay;
+  }
+
+  if (desk)
+  {
+    // get_pos_server_overlay already returns a complete relative path.
+    if (f_desk_image.startsWith("overlays/") ||
+        f_desk_image.startsWith("background/"))
+    {
+      return f_desk_image;
+    }
+    return get_background_path(f_desk_image).toQString();
+  }
+  return get_background_path(f_background).toQString();
 }
 
 
