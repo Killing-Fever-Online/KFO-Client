@@ -171,6 +171,8 @@ void AOApplication::promptMissingThemes(QWidget *parent)
   // forgive me father for I have hard-coded a url path
   const QString download_url =
       "https://github.com/Killing-Fever-Online/KFO-Themes/releases/latest/download/KFO-Themes.7z";
+  const QString download_page =
+      "https://github.com/Killing-Fever-Online/KFO-Themes/releases/latest";
 
   if (parent == nullptr && lobby_constructed)
     parent = w_lobby;
@@ -183,10 +185,10 @@ void AOApplication::promptMissingThemes(QWidget *parent)
       tr("You cannot join a server until a theme is installed."));
 
   auto *install_button =
-      box.addButton(tr("Install themes automatically"), QMessageBox::AcceptRole);
+      box.addButton(tr("Install themes automatically"), QMessageBox::ActionRole);
+  auto *close_button = box.addButton(QMessageBox::Close);
   auto *download_button =
       box.addButton(tr("Open download page"), QMessageBox::ActionRole);
-  auto *close_button = box.addButton(QMessageBox::Close);
   box.setDefaultButton(install_button);
   box.setEscapeButton(close_button);
 
@@ -196,7 +198,7 @@ void AOApplication::promptMissingThemes(QWidget *parent)
     m_package_installer->installArchiveFromUrl(
         download_url, parent, PackageInstaller::InstallTarget::Base);
   else if (box.clickedButton() == download_button)
-    QDesktopServices::openUrl(QUrl(download_url));
+    QDesktopServices::openUrl(QUrl(download_page));
 }
 
 void AOApplication::construct_courtroom()
