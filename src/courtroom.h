@@ -275,6 +275,10 @@ public:
   // Returns true if this message has an objection, otherwise returns false. The result decides when to call handle_ic_message()
   bool handle_objection();
 
+  // Resolves the bubble filename and sound name for the given objection
+  // modifier (e.g. "1", "2", "4&custom.png"). Empty strings mean no objection.
+  void get_objection_assets(const QString &p_objection_mod, QString &p_filename, QString &p_sfx);
+
   // Display the evidence image box when presenting evidence in IC
   void display_evidence_image();
 
@@ -326,7 +330,8 @@ public:
   // filesystem) takes in a list where the first element is the song name and
   // the second is the char id of who played it
   void handle_song(QStringList *p_contents);
-
+  void play_song(QString f_song, int n_char, QString showname_override,
+                 bool looping, int channel, int effect_flags);
   void play_preanim(bool immediate);
 
   // plays the witness testimony or cross examination animation based on
@@ -483,6 +488,9 @@ private:
   QString last_ic_message = "";
 
   QQueue<QStringList> chatmessage_queue;
+
+  // Pending chatmessage that is waiting on its downloads to finish
+  QStringList pending_chatmessage;
 
   // triggers ping_server() every 45 seconds
   QTimer *keepalive_timer;
@@ -746,6 +754,18 @@ private:
   QAction* action_disable_url_sharing;
 
   AOMusicPlayer *music_player;
+
+  struct PendingSong
+  {
+    QString song;
+    int char_id = 0;
+    QString showname_override;
+    bool looping = false;
+    int channel = 0;
+    int effect_flags = 0;
+  };
+  QMap<QString, PendingSong> m_pending_songs;
+
   AOSfxPlayer *sfx_player;
   AOSfxPlayer *objection_player;
   AOBlipPlayer *blip_player;
@@ -963,6 +983,11 @@ private:
   void reset_ui();
 
   void regenerate_ic_chatlog();
+
+  bool download_char_ini(QString char_name);
+
+  void set_charname(QString char_name);
+
 public slots:
   void objection_done();
   void preanim_done();
@@ -1157,9 +1182,15 @@ private slots:
 
   // Proceed to parse the oldest chatmessage and remove it from the stack
   void chatmessage_dequeue();
+  // Starts webcache downloads for pending_chatmessage.
+  // Returns true if at least one download was started.
+  bool prefetch_pending_chatmessage_assets();
 
   void preview_emote(QString emote);
   void update_emote_preview();
+
+  void on_webcache_file_downloaded(const QString &relativePath);
+  void on_webcache_download_failed(const QString &relativePath);
 };
 
 #endif // COURTROOM_H

@@ -22,12 +22,17 @@ public:
   void set_id(int p_id) { m_id = p_id; }
   int get_id() { return m_id; }
 
+  QString emote_comment;
+
 private:
   QWidget *parent;
   AOApplication *ao_app;
   QLabel *ui_selected = nullptr;
 
   int m_id = 0;
+
+  QString download_path;
+  void set_webpath(const QString &relativePath);
 signals:
   void emote_clicked(int p_id);
 

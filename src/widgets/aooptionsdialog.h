@@ -98,6 +98,12 @@ private:
   QCheckBox *ui_menu_bar_visible_btn_cb;
   QCheckBox *ui_crossfade_cb;
 
+  // Webcache settings
+  QCheckBox *ui_webcache_enabled_cb;
+  QSpinBox *ui_webcache_expiry_spinbox;
+  QPushButton *ui_webcache_clear;
+  QLabel *ui_webcache_size_label;
+
   // The keywords tab
   QPlainTextEdit *ui_callwords_textbox;
   QCheckBox *ui_callwords_char_textbox;

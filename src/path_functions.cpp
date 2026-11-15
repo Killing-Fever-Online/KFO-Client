@@ -3,6 +3,7 @@
 #include "file_functions.h"
 #include "mount_manager.h"
 #include "options.h"
+#include "webcache.h"
 
 #include <QDir>
 #include <QRegularExpression>
@@ -46,6 +47,38 @@ VPath AOApplication::get_character_path(QString p_char, QString p_file)
   return VPath("characters/" + p_char + "/" + p_file);
 }
 
+QVector<VPath> AOApplication::get_emote_paths(QString p_filename, QString p_charname, bool p_is_preanim)
+{
+  QString p_prefix = "";
+  if (p_filename.left(3) == "(a)" || p_filename.left(3) == "(b)") { // if we are playing an idle or talking animation
+    p_prefix = p_filename.left(3); // separate the prefix from the emote name
+    p_filename = p_filename.mid(3, -1);
+  }
+  else if (p_is_preanim || p_filename.left(3) == "(c)") { // else if we are playing a preanim or postanim
+    if (p_filename.left(3) == "(c)") { // if we are playing a postanim
+      p_prefix = "(c)"; // separate the prefix from the emote name
+      p_filename = p_filename.mid(3, -1);
+    }
+  }
+  QVector<VPath> pathlist = { // cursed character path resolution vector
+    get_character_path(
+        p_charname, p_prefix + p_filename), // Default path
+    get_character_path(
+        p_charname,
+        p_prefix + "/" + p_filename), // Path check if it's categorized
+                                      // into a folder
+    get_character_path(
+        p_charname,
+        p_filename), // Just use the non-prefixed image, animated or not
+    VPath(p_filename), // The path by itself after the above fail
+    Options::getInstance().assetStreaming() ? VPath(asset_url + "characters/" + p_charname + "/" + p_filename) : VPath(), // Streamed assets path
+    get_theme_path("placeholder"), // Theme placeholder path
+    get_theme_path(
+        "placeholder", default_theme)};
+
+  return pathlist;
+}
+
 VPath AOApplication::get_misc_path(QString p_misc, QString p_file)
 {
   return VPath("misc/" + p_misc + "/" + p_file);
@@ -83,61 +116,59 @@ VPath AOApplication::get_default_background_path(QString p_file)
 
 QString AOApplication::get_pos_path(const QString& pos, const bool desk)
 {
-  // Witness is default BG
-  QString f_background = "wit";
-  QString f_desk_image = "wit_overlay";
-
-  if (desk) {
-    f_desk_image = get_old_pos_path(pos, desk);
-  }
-  else {
-    f_background = get_old_pos_path(pos, desk);
-  }
-
-  // Special desk handling
-  QString desk_override = read_design_ini("overlays/" + f_background, get_background_path("design.ini"));
-  if (desk_override != "") {
-    f_desk_image = get_image_suffix(get_background_path(desk_override));
-  }
-
-  // DRO-style override handling
-  QString suffix = "back";
-  if (desk) {
-    suffix = "front";
-  }
-
-  // Read the positions.ini file
-  QString override = read_design_ini(pos + "/" + suffix, get_background_path("positions.ini"));
-  if (override != "") {
-    // Set both to the override (we only send back 1 of the 2 anyway)
-    f_desk_image = get_image_suffix(get_background_path(override));
-    f_background = get_image_suffix(get_background_path(override));
-  }
-
-  // Server dictates to override our overlay
-  if (w_courtroom->server_overlay != "") {
-    // Overlay is located inside of our BG folder
-    QString path_test = get_image_suffix(get_background_path(w_courtroom->server_overlay));
-    if (file_exists(path_test)) {
-      f_desk_image = path_test;
+  // DRO-style positions.ini declares exact filenames. When the requested key
+  // exists, use it verbatim instead of guessing extensions. Missing keys and
+  // missing positions.ini files fall back to the legacy resolution below.
+  const QString suffix = desk ? "front" : "back";
+  const QString override =
+      read_design_ini(pos + "/" + suffix, get_background_path("positions.ini"));
+  if (!override.isEmpty())
+  {
+    // The server can still dictate a desk overlay.
+    if (desk)
+    {
+      const QString server_overlay = get_pos_server_overlay(pos);
+      if (!server_overlay.isEmpty())
+      {
+        return server_overlay;
+      }
     }
-
-    // Specific overlay *folder* to access inside of the overlay folder
-    path_test = get_image_suffix(VPath("overlays/" + w_courtroom->server_overlay + "/" + pos));
-    if (file_exists(path_test)) {
-      f_desk_image = path_test;
-    }
-
-    // Specific file path to access inside of the overlay folder
-    path_test = get_image_suffix(VPath("overlays/" + w_courtroom->server_overlay));
-    if (file_exists(path_test)) {
-      f_desk_image = path_test;
-    }
+    return get_background_path(override).toQString();
   }
-  if (desk) {
-    return f_desk_image;
+
+  return get_old_pos_path(pos, desk);
+}
+
+QString AOApplication::get_pos_server_overlay(const QString &pos)
+{
+  if (w_courtroom == nullptr || w_courtroom->server_overlay.isEmpty())
+  {
+    return QString();
   }
-  return f_background;
+
+  QString result;
+  // Overlay is located inside of our BG folder
+  VPath path = get_background_path(w_courtroom->server_overlay);
+  if (!get_image_suffix(path).isEmpty())
+  {
+    result = path.toQString();
+  }
+
+  // Specific overlay *folder* to access inside of the overlay folder
+  path = VPath("overlays/" + w_courtroom->server_overlay + "/" + pos);
+  if (!get_image_suffix(path).isEmpty())
+  {
+    result = path.toQString();
+  }
+
+  // Specific file path to access inside of the overlay folder
+  path = VPath("overlays/" + w_courtroom->server_overlay);
+  if (!get_image_suffix(path).isEmpty())
+  {
+    result = path.toQString();
+  }
+
+  return result;
 }
 
 QString AOApplication::get_old_pos_path(const QString& pos, const bool desk)
@@ -198,10 +229,31 @@ QString AOApplication::get_old_pos_path(const QString& pos, const bool desk)
     f_desk_image = pos + "_overlay";
   }
 
-  if (desk) {
-    return get_image_suffix(get_background_path(f_desk_image));
+  // Special desk handling
+  QString desk_override = read_design_ini("overlays/" + f_background, get_background_path("design.ini"));
+  if (!desk_override.isEmpty())
+  {
+    f_desk_image = desk_override;
   }
-  return get_image_suffix(get_background_path(f_background));
+
+  // Server dictates to override our overlay
+  const QString server_overlay = get_pos_server_overlay(pos);
+  if (!server_overlay.isEmpty())
+  {
+    f_desk_image = server_overlay;
+  }
+
+  if (desk)
+  {
+    // get_pos_server_overlay already returns a complete relative path.
+    if (f_desk_image.startsWith("overlays/") ||
+        f_desk_image.startsWith("background/"))
+    {
+      return f_desk_image;
+    }
+    return get_background_path(f_desk_image).toQString();
+  }
+  return get_background_path(f_background).toQString();
 }
 
 
@@ -326,7 +378,7 @@ QString AOApplication::get_image(QString p_element, QString p_theme, QString p_s
   return ret;
 }
 
-QString AOApplication::get_sfx(QString p_sfx, QString p_misc, QString p_character)
+QVector<VPath> AOApplication::get_sfx_paths(QString p_sfx, QString p_misc, QString p_character)
 {
   QVector<VPath> pathlist;
   // Sounds subfolder is prioritized for organization sake
@@ -335,13 +387,47 @@ QString AOApplication::get_sfx(QString p_sfx, QString p_misc, QString p_characte
   pathlist += get_asset_paths(p_sfx, Options::getInstance().theme(), Options::getInstance().subTheme(), default_theme, p_misc, p_character);
   // If SFX not found, search base/sounds/general/ folder
   pathlist += get_sounds_path(p_sfx);
-  QString ret = get_sfx_path(pathlist);
+  return pathlist;
+}
+
+QString AOApplication::get_sfx(QString p_sfx, QString p_misc, QString p_character)
+{
+  QString ret = get_sfx_path(get_sfx_paths(p_sfx, p_misc, p_character));
   if (ret.isEmpty()) {
     qWarning().nospace() << "could not find sfx " << p_sfx
                          << " (char = " << p_character
                          << ", misc = " << p_misc << ")";
   }
   return ret;
+}
+
+QString AOApplication::download_sfx(QString p_sfx, QString p_misc, QString p_character)
+{
+  if (!Options::getInstance().webcacheEnabled() || asset_url.isEmpty())
+  {
+    return QString();
+  }
+
+  const QStringList extensions = assetExtensions(
+      "sfx_extensions", {".opus", ".ogg", ".mp3", ".wav"});
+  if (extensions.isEmpty())
+  {
+    // The manifest is authoritative and didn't advertise SFX extensions.
+    return QString();
+  }
+
+  const QVector<VPath> pathlist = get_sfx_paths(p_sfx, p_misc, p_character);
+  for (const VPath &path : pathlist)
+  {
+    QString lowerPath = webcache()->resolve(path.toQString(), extensions);
+    if (!lowerPath.isEmpty())
+    {
+      webcache()->download(lowerPath);
+      return lowerPath;
+    }
+  }
+
+  return QString();
 }
 
 QString AOApplication::get_case_sensitive_path(QString p_file)
@@ -427,14 +513,21 @@ QString AOApplication::get_real_path(const VPath &vpath,
     }
   }
 
+  // Check webcache if local file not found
+  if (Options::getInstance().webcacheEnabled() && !asset_url.isEmpty())
+  {
+    QString cached = m_webcache->getCachedPath(vpath.toQString(), suffixes);
+    if (!cached.isEmpty())
+    {
+      asset_lookup_cache.insert(qHash(vpath), cached);
+      return cached;
+    }
+  }
+
   // Not found in mount paths; check if the file is remote
   QString remotePath = vpath.toQString();
   if (remotePath.startsWith("http:") || remotePath.startsWith("https:")) {
       return remotePath;
-  // } else if (!asset_url.isEmpty()) { // Reminder to change this later
-  //    remotePath = asset_url + remotePath;
-  //    qDebug() << "Remote path: " << remotePath;
-  //    return QString();
   }
 
   // File or directory not found
@@ -446,4 +539,40 @@ void AOApplication::invalidate_lookup_cache() {
   dir_listing_cache.clear();
   dir_listing_exist_cache.clear();
   ini_cache.clear();
+}
+
+// Lowercase path components (for local storage)
+QString AOApplication::lowercasePath(const QString &path)
+{
+  QStringList components = path.split('/');
+  QStringList result;
+  for (const QString &component : components)
+  {
+    if (component.isEmpty())
+    {
+      continue;
+    }
+    result.append(component.toLower());
+  }
+  return result.join('/');
+}
+
+// URL-encode path for web requests (like webAO's encodeURI)
+// Uses encodeURI-compatible encoding (preserves safe characters like ! ' ( ) *)
+QString AOApplication::urlEncodePath(const QString &path)
+{
+  QStringList components = path.split('/');
+  QStringList encoded;
+  // Characters that encodeURI does NOT encode (excluding / which we handle via split)
+  const QByteArray safeChars = ";,?:@&=+$-_.!~*'()#";
+  for (const QString &component : components)
+  {
+    if (component.isEmpty())
+    {
+      continue;
+    }
+    QString percentEncoded = QUrl::toPercentEncoding(component, safeChars);
+    encoded.append(percentEncoded);
+  }
+  return encoded.join('/');
 }

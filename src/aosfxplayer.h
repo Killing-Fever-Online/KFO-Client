@@ -7,10 +7,14 @@
 #include "aoapplication.h"
 
 #include <QDebug>
+#include <QHash>
+#include <QObject>
+#include <QString>
 #include <QWidget>
 #include <string.h>
 
-class AOSfxPlayer {
+class AOSfxPlayer : public QObject {
+  Q_OBJECT
 public:
   AOSfxPlayer(QWidget *parent, AOApplication *p_ao_app);
 
@@ -24,6 +28,14 @@ public:
   int m_channel = 0;
   int get_volume() { return m_volume * 100; };
 private:
+  struct PendingSfx
+  {
+    QString sfx;
+    QString character;
+    QString misc;
+    QString relativePath;
+  };
+
   QWidget *m_parent;
   AOApplication *ao_app;
   qreal m_volume = 0;
@@ -35,6 +47,12 @@ private:
   const int m_channelmax = 5;
 
   HSTREAM m_stream_list[5];
+
+  QHash<QString, PendingSfx> m_pending_sfx;
+
+private slots:
+  void on_webcache_file_downloaded(const QString &relativePath);
+  void on_webcache_download_failed(const QString &relativePath);
 };
 
 #endif // AOSFXPLAYER_H

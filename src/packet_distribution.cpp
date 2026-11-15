@@ -6,6 +6,7 @@
 #include "lobby.h"
 #include "networkmanager.h"
 #include "options.h"
+#include "webcache.h"
 #include "widgets/aooptionsdialog.h"
 
 void AOApplication::append_to_demofile(QString packet_string)
@@ -23,6 +24,16 @@ void AOApplication::append_to_demofile(QString packet_string)
 
 void AOApplication::server_packet_received(AOPacket *p_packet)
 {
+  if (m_waiting_for_extensions)
+  {
+    PausedServerPacket paused;
+    paused.header = p_packet->get_header();
+    paused.contents = p_packet->get_contents();
+    m_paused_server_packets.enqueue(paused);
+    delete p_packet;
+    return;
+  }
+
   QStringList f_contents_encoded = p_packet->get_contents();
   QString f_packet_encoded = p_packet->to_string();
   p_packet->net_decode();
@@ -797,7 +808,20 @@ void AOApplication::server_packet_received(AOPacket *p_packet)
     }
     QUrl t_asset_url = QUrl::fromPercentEncoding(f_contents.at(0).toUtf8());
     if (t_asset_url.isValid())
-    asset_url = t_asset_url.toString();
+    {
+      const QString new_asset_url = t_asset_url.toString();
+      if (asset_url != new_asset_url)
+      {
+        asset_url = new_asset_url;
+        invalidate_lookup_cache();
+      }
+      if (webcache()->fetchExtensions())
+      {
+        // Hold subsequent packets until the manifest is resolved, so no
+        // asset is downloaded with fallback extensions in the meantime.
+        m_waiting_for_extensions = true;
+      }
+    }
   }
   // AO 2.11 player list: register a player (PR) or update one of its fields (PU).
   else if (header == "PR") {

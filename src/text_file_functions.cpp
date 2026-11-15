@@ -1,6 +1,7 @@
 #include "text_file_functions.h"
 #include "aoutils.h"
 #include "options.h"
+#include "webcache.h"
 
 QStringList AOApplication::get_list_file(VPath path)
 {
@@ -505,7 +506,7 @@ QString AOApplication::get_char_side(QString p_char)
   return f_result;
 }
 
-QString AOApplication::get_blips(QString p_char)
+QString AOApplication::get_blip_name(QString p_char)
 {
   QString f_result = read_char_ini(p_char, "blips", "Options");
 
@@ -515,6 +516,13 @@ QString AOApplication::get_blips(QString p_char)
       f_result = "male";
   }
 
+  return f_result;
+}
+
+QString AOApplication::get_blips(QString p_char)
+{
+  QString f_result = get_blip_name(p_char);
+
   if (!file_exists(get_sfx_suffix(get_sounds_path(f_result)))) {
     if (file_exists(get_sfx_suffix(get_sounds_path("../blips/" + f_result))))
       return "../blips/" + f_result; // Return the cool kids variant
@@ -522,6 +530,41 @@ QString AOApplication::get_blips(QString p_char)
     return "sfx-blip" + f_result; // Return legacy variant
   }
   return f_result;
+}
+
+QString AOApplication::download_blips(QString p_char)
+{
+  if (!Options::getInstance().webcacheEnabled() || asset_url.isEmpty())
+  {
+    return QString();
+  }
+
+  const QStringList extensions = assetExtensions(
+      "blip_extensions", {".opus", ".ogg", ".mp3", ".wav"});
+  if (extensions.isEmpty())
+  {
+    // The manifest is authoritative and didn't advertise blip extensions.
+    return QString();
+  }
+
+  const QString f_result = get_blip_name(p_char);
+  const QVector<VPath> pathlist = {
+      get_sounds_path(f_result),
+      get_sounds_path("../blips/" + f_result),
+      get_sounds_path("sfx-blip" + f_result),
+  };
+
+  for (const VPath &path : pathlist)
+  {
+    QString lowerPath = webcache()->resolve(path.toQString(), extensions);
+    if (!lowerPath.isEmpty())
+    {
+      webcache()->download(lowerPath);
+      return lowerPath;
+    }
+  }
+
+  return QString();
 }
 
 QString AOApplication::get_emote_property(QString p_char, QString p_emote,

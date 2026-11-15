@@ -323,6 +323,13 @@ public:
   bool crossfade() const;
   void setCrossfade(bool value);
 
+  // Webcache settings
+  bool webcacheEnabled() const;
+  void setWebcacheEnabled(bool value);
+
+  int webcacheExpiryHours() const;
+  void setWebcacheExpiryHours(int hours);
+
   // Default OOC autocompleter set
   QString defaultAutocompleterSet() const;
   void setDefaultAutocompleterSet(QString value);

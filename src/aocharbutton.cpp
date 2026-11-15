@@ -1,6 +1,7 @@
 #include "aocharbutton.h"
 
 #include "file_functions.h"
+#include "webcache.h"
 
 AOCharButton::AOCharButton(QWidget *parent, AOApplication *p_ao_app, int x_pos,
                            int y_pos, bool is_taken)
@@ -37,6 +38,8 @@ AOCharButton::AOCharButton(QWidget *parent, AOApplication *p_ao_app, int x_pos,
   ui_selector->set_image("char_selector");
   ui_selector->setAttribute(Qt::WA_TransparentForMouseEvents);
   ui_selector->hide();
+
+  connect(ao_app->webcache(), &WebCache::fileDownloaded, this, &AOCharButton::set_webpath);
 }
 
 void AOCharButton::reset()
@@ -63,10 +66,43 @@ void AOCharButton::set_passworded() { ui_passworded->show(); }
 
 void AOCharButton::set_image(QString p_character)
 {
-  QString image_path = ao_app->get_real_path(
-      ao_app->get_character_path(p_character, "char_icon"),
-      {".png"});
+  character = p_character;
+  VPath char_path = ao_app->get_character_path(p_character, "char_icon");
+  // Local lookups always use the broad list; only remote probing is governed
+  // by the server manifest.
+  const QStringList local_extensions = {".png", ".webp"};
+  QString image_path = ao_app->get_real_path(char_path, local_extensions);
 
+  // WebCache DL the character icon
+  if (Options::getInstance().webcacheEnabled() && !file_exists(image_path)) {
+    const QStringList extensions = ao_app->assetExtensions("charicon_extensions", local_extensions);
+    if (!extensions.isEmpty()) {
+      QString lowerPath = ao_app->webcache()->resolve(char_path.toQString(), extensions);
+      qDebug() << "WebCache: resolving char icon of " << char_path.toQString();
+      if (!lowerPath.isEmpty()) {
+        qDebug() << "WebCache: starting download of char icon " << lowerPath;
+        download_path = lowerPath;
+        ao_app->webcache()->download(lowerPath);
+        return;
+      }
+    }
+  }
+  set_image_path(image_path);
+}
+
+void AOCharButton::set_webpath(const QString &relativePath)
+{
+  if (relativePath != download_path)
+  {
+    return;
+  }
+  qDebug() << "WebCache: character path set to " << ao_app->get_real_path(VPath(relativePath));
+  set_image_path(ao_app->get_real_path(VPath(relativePath)));
+}
+
+void AOCharButton::set_image_path(const QString &image_path)
+{
+  download_path = "";
   if (file_exists(image_path)) {
     this->setStyleSheet("QPushButton { border-image: url(\"" + image_path +
                         "\") 0 0 0 0 stretch stretch; }"
@@ -78,7 +114,7 @@ void AOCharButton::set_image(QString p_character)
     this->setStyleSheet("QPushButton { border-image: url(); }"
                         "QToolTip { background-image: url(); color: #000000; "
                         "background-color: #ffffff; border: 0px; }");
-    this->setText(p_character);
+    this->setText(character);
   }
 }
 
