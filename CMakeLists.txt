@@ -16,6 +16,7 @@ option(AO_ENABLE_DISCORD_RPC "Enable Discord Rich Presence" ON)
 
 find_package(QT NAMES Qt6 Core Gui MultimediaWidgets Network Widgets Concurrent WebSockets UiTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui MultimediaWidgets Network Widgets Concurrent WebSockets UiTools)
+find_package(LibArchive REQUIRED)
 
 qt_add_executable(Attorney_Online
   src/main.cpp
@@ -128,7 +129,7 @@ target_link_libraries(Attorney_Online PRIVATE
   Qt${QT_VERSION_MAJOR}::Concurrent
   Qt${QT_VERSION_MAJOR}::WebSockets
   Qt${QT_VERSION_MAJOR}::UiTools
-  archive
+  LibArchive::LibArchive
   bass
   bassopus
   bassmidi
