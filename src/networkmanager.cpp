@@ -9,81 +9,9 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QNetworkInformation>
 #include <QNetworkReply>
 #include <QDesktopServices>
 #include <QPushButton>
-
-#ifndef Q_OS_WIN
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
-#endif
-
-namespace {
-
-#ifdef Q_OS_WIN
-// winsock2.h/mstcpip.h conflict with winsock.h, which is pulled in through
-// windows.h before this file is parsed. Only these bits are needed, so declare
-// them locally instead.
-#ifndef SIO_KEEPALIVE_VALS
-#define SIO_KEEPALIVE_VALS 0x98000004
-#endif
-
-struct ao_tcp_keepalive {
-  unsigned long onoff;
-  unsigned long keepalivetime;
-  unsigned long keepaliveinterval;
-};
-#endif
-
-// Ask the OS to probe idle TCP connections. This is the only liveness check
-// available for servers that do not implement the AO CH/CHECK exchange.
-void enable_tcp_keepalive(qintptr p_socket_descriptor)
-{
-  if (p_socket_descriptor == -1)
-    return;
-
-#ifdef Q_OS_WIN
-  SOCKET fd = static_cast<SOCKET>(p_socket_descriptor);
-  BOOL enable = TRUE;
-  setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
-             reinterpret_cast<const char *>(&enable), sizeof(enable));
-
-  ao_tcp_keepalive values{};
-  values.onoff = 1;
-  values.keepalivetime = 30000;
-  values.keepaliveinterval = 10000;
-  DWORD bytes_returned = 0;
-  WSAIoctl(fd, SIO_KEEPALIVE_VALS, &values, sizeof(values), nullptr, 0,
-           &bytes_returned, nullptr, nullptr);
-#else
-  const int fd = static_cast<int>(p_socket_descriptor);
-  int enable = 1;
-  if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &enable, sizeof(enable)) != 0) {
-    qWarning() << "failed to enable SO_KEEPALIVE";
-    return;
-  }
-
-  int idle = 30;
-  int interval = 10;
-  int count = 3;
-#if defined(Q_OS_LINUX) || defined(Q_OS_ANDROID) || defined(Q_OS_FREEBSD) || \
-    defined(Q_OS_NETBSD) || defined(Q_OS_OPENBSD) || defined(Q_OS_DRAGONFLY)
-  setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle));
-#elif defined(Q_OS_MACOS) || defined(Q_OS_IOS) || defined(Q_OS_TVOS)
-  setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof(idle));
-#endif
-#ifdef TCP_KEEPINTVL
-  setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval));
-#endif
-#ifdef TCP_KEEPCNT
-  setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count));
-#endif
-#endif
-}
-
-} // namespace
 
 NetworkManager::NetworkManager(AOApplication *parent) : QObject(parent)
 {
@@ -133,20 +61,6 @@ NetworkManager::NetworkManager(AOApplication *parent) : QObject(parent)
               probe_connection(true);
             }
           });
-
-  if (QNetworkInformation::loadBackendByFeatures(
-          QNetworkInformation::Features(
-              QNetworkInformation::Feature::Reachability))) {
-    connect(QNetworkInformation::instance(),
-            &QNetworkInformation::reachabilityChanged, this,
-            [this](QNetworkInformation::Reachability reachability) {
-              if (reachability == QNetworkInformation::Reachability::Online &&
-                  connected) {
-                qInfo() << "network is online again, probing connection";
-                probe_connection(true);
-              }
-            });
-  }
 
   connect(stream, &QNetworkAccessManager::finished, this, &NetworkManager::image_reply_finished);
 }
@@ -301,7 +215,6 @@ void NetworkManager::connect_to_server(server_type p_server)
       if (socket != server_socket.tcp)
         return;
       qDebug() << "established connection to server";
-      enable_tcp_keepalive(socket->socketDescriptor());
       established_connection = true;
       Q_EMIT server_connected(established_connection);
     });
