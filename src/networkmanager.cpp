@@ -14,16 +14,28 @@
 #include <QDesktopServices>
 #include <QPushButton>
 
-#ifdef Q_OS_WIN
-#include <winsock2.h>
-#include <mstcpip.h>
-#else
+#ifndef Q_OS_WIN
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #endif
 
 namespace {
+
+#ifdef Q_OS_WIN
+// winsock2.h/mstcpip.h conflict with winsock.h, which is pulled in through
+// windows.h before this file is parsed. Only these bits are needed, so declare
+// them locally instead.
+#ifndef SIO_KEEPALIVE_VALS
+#define SIO_KEEPALIVE_VALS 0x98000004
+#endif
+
+struct ao_tcp_keepalive {
+  unsigned long onoff;
+  unsigned long keepalivetime;
+  unsigned long keepaliveinterval;
+};
+#endif
 
 // Ask the OS to probe idle TCP connections. This is the only liveness check
 // available for servers that do not implement the AO CH/CHECK exchange.
@@ -38,7 +50,7 @@ void enable_tcp_keepalive(qintptr p_socket_descriptor)
   setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
              reinterpret_cast<const char *>(&enable), sizeof(enable));
 
-  tcp_keepalive values{};
+  ao_tcp_keepalive values{};
   values.onoff = 1;
   values.keepalivetime = 30000;
   values.keepaliveinterval = 10000;
